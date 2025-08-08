@@ -11,14 +11,36 @@ class SearchPage extends StatefulWidget {
   State<SearchPage> createState() => _SearchPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _SearchPageState extends State<SearchPage> with TickerProviderStateMixin {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  bool _showSuggestions = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    
+    _searchFocusNode.addListener(() {
+      setState(() {
+        _showSuggestions = _searchFocusNode.hasFocus && _searchController.text.isNotEmpty;
+      });
+    });
+  }
 
   @override
   void dispose() {
     _searchController.dispose();
     _searchFocusNode.dispose();
+    _animationController.dispose();
     super.dispose();
   }
 
@@ -27,15 +49,15 @@ class _SearchPageState extends State<SearchPage> {
     return Scaffold(
       body: Column(
         children: [
-          // SearchBar no topo
+          // SearchBar interativa no topo
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             decoration: BoxDecoration(
               color: AppColors.surface,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.1),
-                  blurRadius: 4,
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
               ],
@@ -44,15 +66,25 @@ class _SearchPageState extends State<SearchPage> {
               builder: (context, searchVM, child) {
                 return Column(
                   children: [
-                    // Campo de busca principal
-                    Container(
+                    // Campo de busca principal com animações
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
                       decoration: BoxDecoration(
                         color: AppColors.cardColor,
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(16),
                         border: Border.all(
-                          color: AppColors.primary.withOpacity(0.3),
-                          width: 1,
+                          color: _searchFocusNode.hasFocus 
+                              ? AppColors.primary 
+                              : AppColors.primary.withOpacity(0.3),
+                          width: _searchFocusNode.hasFocus ? 2 : 1,
                         ),
+                        boxShadow: _searchFocusNode.hasFocus ? [
+                          BoxShadow(
+                            color: AppColors.primary.withOpacity(0.2),
+                            blurRadius: 8,
+                            offset: const Offset(0, 2),
+                          ),
+                        ] : null,
                       ),
                       child: TextField(
                         controller: _searchController,
@@ -60,48 +92,120 @@ class _SearchPageState extends State<SearchPage> {
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 16,
+                          fontWeight: FontWeight.w500,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Buscar backups...',
+                          hintText: 'Buscar por nome, data ou caminho...',
                           hintStyle: const TextStyle(
                             color: AppColors.textSecondary,
+                            fontSize: 15,
                           ),
-                          prefixIcon: Icon(
-                            Icons.search,
-                            color: AppColors.primary,
+                          prefixIcon: AnimatedContainer(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              Icons.search_rounded,
+                              color: _searchFocusNode.hasFocus 
+                                  ? AppColors.primary 
+                                  : AppColors.textSecondary,
+                              size: 24,
+                            ),
                           ),
                           suffixIcon: _searchController.text.isNotEmpty
-                              ? IconButton(
-                                  icon: Icon(
-                                    Icons.clear,
-                                    color: AppColors.textSecondary,
-                                  ),
-                                  onPressed: () {
-                                    _searchController.clear();
-                                    searchVM.clearSearch();
-                                  },
+                              ? Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    // Contador de resultados
+                                    if (searchVM.searchResults.isNotEmpty && !searchVM.isSearching)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 8,
+                                          vertical: 4,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: AppColors.primary.withOpacity(0.1),
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Text(
+                                          '${searchVM.searchResults.length}',
+                                          style: const TextStyle(
+                                            color: AppColors.primary,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    const SizedBox(width: 8),
+                                    // Botão limpar
+                                    IconButton(
+                                      icon: Icon(
+                                        Icons.clear_rounded,
+                                        color: AppColors.textSecondary,
+                                        size: 20,
+                                      ),
+                                      onPressed: () {
+                                        _searchController.clear();
+                                        searchVM.clearSearch();
+                                        setState(() {
+                                          _showSuggestions = false;
+                                        });
+                                      },
+                                      tooltip: 'Limpar busca',
+                                    ),
+                                  ],
                                 )
                               : null,
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
+                            horizontal: 20,
+                            vertical: 18,
                           ),
                         ),
                         onChanged: (query) {
                           searchVM.searchBackups(query);
-                          setState(() {}); // Para atualizar o suffixIcon
+                          setState(() {
+                            _showSuggestions = query.isNotEmpty && _searchFocusNode.hasFocus;
+                          });
+                          
+                          if (query.isNotEmpty) {
+                            _animationController.forward();
+                          } else {
+                            _animationController.reverse();
+                          }
+                        },
+                        onSubmitted: (query) {
+                          if (query.isNotEmpty) {
+                            searchVM.addToSearchHistory(query);
+                            _searchFocusNode.unfocus();
+                            setState(() {
+                              _showSuggestions = false;
+                            });
+                          }
                         },
                       ),
                     ),
                     
-                    // Sugestões de autocompletar
+                    // Sugestões de autocompletar com animação
+                    AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      height: _showSuggestions ? null : 0,
+                      child: _showSuggestions ? Column(
+                        children: [
+                          const SizedBox(height: 8),
+                          FadeTransition(
+                            opacity: _fadeAnimation,
+                            child: Container(
+                              constraints: const BoxConstraints(maxHeight: 160),
+                              child: _buildInteractiveSuggestions(searchVM),
+                            ),
+                          ),
+                        ],
+                      ) : const SizedBox.shrink(),
+                    ),
+                    
+                    // Filtros rápidos
                     if (_searchController.text.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 120),
-                        child: _buildSuggestions(searchVM),
-                      ),
+                      const SizedBox(height: 12),
+                      _buildQuickFilters(searchVM),
                     ],
                   ],
                 );
@@ -134,48 +238,244 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildSuggestions(SearchViewModel searchVM) {
+  Widget _buildInteractiveSuggestions(SearchViewModel searchVM) {
     final suggestions = searchVM.getFilteredSuggestions(_searchController.text);
+    final recentSearches = searchVM.getRecentSearches();
     
-    if (suggestions.isEmpty) {
-      return const SizedBox.shrink();
+    if (suggestions.isEmpty && recentSearches.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        child: const Text(
+          'Digite para ver sugestões...',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 14,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      );
     }
     
     return Container(
       decoration: BoxDecoration(
         color: AppColors.cardColor,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
           color: AppColors.primary.withOpacity(0.2),
           width: 1,
         ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: suggestions.length,
-        itemBuilder: (context, index) {
-          final suggestion = suggestions[index];
-          return ListTile(
-            dense: true,
-            leading: Icon(
-              Icons.history,
-              color: AppColors.textSecondary,
-              size: 18,
-            ),
-            title: Text(
-              suggestion,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 14,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Sugestões baseadas em backups existentes
+          if (suggestions.isNotEmpty) ...[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.lightbulb_outline_rounded,
+                    color: AppColors.accent,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Sugestões',
+                    style: TextStyle(
+                      color: AppColors.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ),
             ),
-            onTap: () {
-              _searchController.text = suggestion;
-              searchVM.searchBackups(suggestion);
-              _searchFocusNode.unfocus();
-            },
-          );
-        },
+            ...suggestions.take(3).map((suggestion) => _buildSuggestionItem(
+              suggestion,
+              Icons.folder_outlined,
+              AppColors.primary,
+              () {
+                _searchController.text = suggestion;
+                searchVM.searchBackups(suggestion);
+                _searchFocusNode.unfocus();
+                setState(() {
+                  _showSuggestions = false;
+                });
+              },
+            )),
+          ],
+          
+          // Buscas recentes
+          if (recentSearches.isNotEmpty) ...[
+            if (suggestions.isNotEmpty) const Divider(height: 1, color: AppColors.textSecondary),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.history_rounded,
+                    color: AppColors.textSecondary,
+                    size: 16,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Buscas recentes',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const Spacer(),
+                  GestureDetector(
+                    onTap: () {
+                      searchVM.clearSearchHistory();
+                      setState(() {});
+                    },
+                    child: const Text(
+                      'Limpar',
+                      style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            ...recentSearches.take(3).map((search) => _buildSuggestionItem(
+              search,
+              Icons.history,
+              AppColors.textSecondary,
+              () {
+                _searchController.text = search;
+                searchVM.searchBackups(search);
+                _searchFocusNode.unfocus();
+                setState(() {
+                  _showSuggestions = false;
+                });
+              },
+            )),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSuggestionItem(String text, IconData icon, Color iconColor, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: iconColor,
+              size: 18,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(
+                  color: AppColors.textPrimary,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w500,
+                ),
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            Icon(
+              Icons.north_west_rounded,
+              color: AppColors.textSecondary,
+              size: 16,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildQuickFilters(SearchViewModel searchVM) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _buildFilterChip(
+            'Hoje',
+            Icons.today_rounded,
+            searchVM.isFilterActive('today'),
+            () => searchVM.toggleDateFilter('today'),
+          ),
+          const SizedBox(width: 8),
+          _buildFilterChip(
+            'Esta semana',
+            Icons.date_range_rounded,
+            searchVM.isFilterActive('week'),
+            () => searchVM.toggleDateFilter('week'),
+          ),
+          const SizedBox(width: 8),
+          _buildFilterChip(
+            'Este mês',
+            Icons.calendar_month_rounded,
+            searchVM.isFilterActive('month'),
+            () => searchVM.toggleDateFilter('month'),
+          ),
+          const SizedBox(width: 8),
+          _buildFilterChip(
+            'Grandes (>100MB)',
+            Icons.storage_rounded,
+            searchVM.isFilterActive('large'),
+            () => searchVM.toggleSizeFilter('large'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, IconData icon, bool isActive, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        decoration: BoxDecoration(
+          color: isActive ? AppColors.primary : AppColors.cardColor,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isActive ? AppColors.primary : AppColors.primary.withOpacity(0.3),
+            width: 1,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              color: isActive ? Colors.white : AppColors.primary,
+              size: 16,
+            ),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? Colors.white : AppColors.primary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -421,13 +721,13 @@ class _SearchPageState extends State<SearchPage> {
           
           const SizedBox(height: 8),
           
-          // Senha (clicável para copiar)
+          // Senha (clicável para copiar) - Melhorada
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
                 Icon(
-                  Icons.lock,
+                  Icons.lock_rounded,
                   color: AppColors.accent,
                   size: 16,
                 ),
@@ -437,6 +737,7 @@ class _SearchPageState extends State<SearchPage> {
                   style: TextStyle(
                     color: AppColors.textSecondary,
                     fontSize: 13,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
                 Expanded(
@@ -445,23 +746,42 @@ class _SearchPageState extends State<SearchPage> {
                       await searchVM.copyPasswordToClipboard(result.backup.id);
                       
                       if (mounted) {
+                        // Feedback visual melhorado
+                        HapticFeedback.lightImpact();
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: const Text('Senha copiada para área de transferência'),
+                            content: Row(
+                              children: [
+                                Icon(
+                                  Icons.check_circle_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                const SizedBox(width: 8),
+                                const Text(
+                                  'Senha copiada!',
+                                  style: TextStyle(fontWeight: FontWeight.w600),
+                                ),
+                              ],
+                            ),
                             backgroundColor: AppColors.primary,
                             duration: const Duration(seconds: 2),
+                            behavior: SnackBarBehavior.floating,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
                           ),
                         );
                       }
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
+                        horizontal: 12,
+                        vertical: 8,
                       ),
                       decoration: BoxDecoration(
                         color: AppColors.accent.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(8),
                         border: Border.all(
                           color: AppColors.accent.withOpacity(0.3),
                           width: 1,
@@ -470,20 +790,31 @@ class _SearchPageState extends State<SearchPage> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            result.password,
-                            style: const TextStyle(
-                              color: AppColors.accent,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w500,
-                              fontFamily: 'monospace',
+                          Flexible(
+                            child: Text(
+                              result.password,
+                              style: const TextStyle(
+                                color: AppColors.accent,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'monospace',
+                                letterSpacing: 0.5,
+                              ),
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(width: 4),
-                          Icon(
-                            Icons.copy,
-                            color: AppColors.accent,
-                            size: 12,
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.all(2),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withOpacity(0.2),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Icon(
+                              Icons.copy_rounded,
+                              color: AppColors.accent,
+                              size: 14,
+                            ),
                           ),
                         ],
                       ),

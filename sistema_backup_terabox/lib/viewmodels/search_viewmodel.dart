@@ -25,9 +25,11 @@ class SearchViewModel extends ChangeNotifier {
   // Estado da busca
   List<Backup> _searchResults = [];
   List<String> _suggestions = [];
+  List<String> _recentSearches = [];
   bool _isSearching = false;
   String _currentQuery = '';
   String _lastCopiedPassword = '';
+  Map<String, bool> _activeFilters = {};
 
   // Getters
   List<Backup> get searchResults => _searchResults;
@@ -39,6 +41,7 @@ class SearchViewModel extends ChangeNotifier {
       : _backupService = BackupService(_database, _passwordManager) {
     _logger.i('🔍 SearchViewModel inicializado');
     _loadSuggestions();
+    _loadRecentSearches();
   }
 
   /// Carrega sugestões iniciais baseadas nos backups existentes
@@ -74,8 +77,12 @@ class SearchViewModel extends ChangeNotifier {
 
     try {
       // Buscar no banco de dados
-      _searchResults = await _backupService.searchBackups(query);
+      List<Backup> results = await _backupService.searchBackups(query);
       
+      // Aplicar filtros ativos
+      results = _applyActiveFilters(results);
+      
+      _searchResults = results;
       _logger.d('📊 ${_searchResults.length} resultados encontrados');
       
     } catch (e) {
@@ -318,6 +325,119 @@ class SearchViewModel extends ChangeNotifier {
   /// Atualiza as sugestões quando novos backups são criados
   void refreshSuggestions() {
     _loadSuggestions();
+  }
+
+  /// Carrega buscas recentes do armazenamento local
+  Future<void> _loadRecentSearches() async {
+    try {
+      // Por enquanto, usar uma lista em memória
+      // Em uma implementação completa, isso seria carregado do SharedPreferences
+      _recentSearches = [];
+      _logger.d('📋 Buscas recentes carregadas');
+    } catch (e) {
+      _logger.e('❌ Erro ao carregar buscas recentes: $e');
+    }
+  }
+
+  /// Obtém lista de buscas recentes
+  List<String> getRecentSearches() {
+    return _recentSearches.take(5).toList();
+  }
+
+  /// Adiciona uma busca ao histórico
+  void addToSearchHistory(String query) {
+    if (query.trim().isEmpty) return;
+    
+    // Remove se já existe
+    _recentSearches.remove(query);
+    // Adiciona no início
+    _recentSearches.insert(0, query);
+    // Mantém apenas os últimos 10
+    if (_recentSearches.length > 10) {
+      _recentSearches = _recentSearches.take(10).toList();
+    }
+    
+    _logger.d('📝 Adicionado ao histórico: "$query"');
+    // Em uma implementação completa, salvaria no SharedPreferences aqui
+  }
+
+  /// Limpa o histórico de buscas
+  void clearSearchHistory() {
+    _recentSearches.clear();
+    _logger.d('🧹 Histórico de buscas limpo');
+    notifyListeners();
+  }
+
+  /// Verifica se um filtro está ativo
+  bool isFilterActive(String filterKey) {
+    return _activeFilters[filterKey] ?? false;
+  }
+
+  /// Alterna filtro de data
+  void toggleDateFilter(String period) {
+    // Desativa outros filtros de data
+    _activeFilters.removeWhere((key, value) => ['today', 'week', 'month'].contains(key));
+    
+    if (!isFilterActive(period)) {
+      _activeFilters[period] = true;
+    }
+    
+    _logger.d('📅 Filtro de data alterado: $period');
+    
+    // Reaplica a busca atual
+    if (_currentQuery.isNotEmpty) {
+      searchBackups(_currentQuery);
+    } else {
+      notifyListeners();
+    }
+  }
+
+  /// Alterna filtro de tamanho
+  void toggleSizeFilter(String sizeType) {
+    if (isFilterActive(sizeType)) {
+      _activeFilters.remove(sizeType);
+    } else {
+      _activeFilters[sizeType] = true;
+    }
+    
+    _logger.d('📏 Filtro de tamanho alterado: $sizeType');
+    
+    // Reaplica a busca atual
+    if (_currentQuery.isNotEmpty) {
+      searchBackups(_currentQuery);
+    } else {
+      notifyListeners();
+    }
+  }
+
+  /// Aplica filtros ativos aos resultados
+  List<Backup> _applyActiveFilters(List<Backup> results) {
+    List<Backup> filteredResults = List.from(results);
+    
+    // Filtros de data
+    if (isFilterActive('today')) {
+      final today = DateTime.now();
+      final startOfDay = DateTime(today.year, today.month, today.day);
+      filteredResults = filteredResults.where((backup) => 
+        backup.createdAt.isAfter(startOfDay)).toList();
+    } else if (isFilterActive('week')) {
+      final weekAgo = DateTime.now().subtract(const Duration(days: 7));
+      filteredResults = filteredResults.where((backup) => 
+        backup.createdAt.isAfter(weekAgo)).toList();
+    } else if (isFilterActive('month')) {
+      final monthAgo = DateTime.now().subtract(const Duration(days: 30));
+      filteredResults = filteredResults.where((backup) => 
+        backup.createdAt.isAfter(monthAgo)).toList();
+    }
+    
+    // Filtros de tamanho
+    if (isFilterActive('large')) {
+      const largeSizeThreshold = 100 * 1024 * 1024; // 100MB
+      filteredResults = filteredResults.where((backup) => 
+        (backup.fileSize ?? 0) > largeSizeThreshold).toList();
+    }
+    
+    return filteredResults;
   }
 
   @override
