@@ -6,6 +6,7 @@ import '../services/password_manager.dart';
 import '../services/database.dart';
 import '../services/terabox_service.dart';
 import '../services/gmail_service.dart';
+import '../services/manual_service.dart';
 import '../utils/password_test_runner.dart';
 import '../utils/app_theme.dart';
 
@@ -919,6 +920,160 @@ class _SettingsPageState extends State<SettingsPage> {
             
             const SizedBox(height: 24),
             
+            // Seção Manual de Autenticação
+            _buildSection(
+              title: 'Manual de Autenticação',
+              icon: Icons.help_outline,
+              color: AppColors.accent,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text(
+                    'Guia completo para configurar OAuth2 do Terabox e senha de app do Gmail:',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Botão principal do manual
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: _openAuthenticationManual,
+                      icon: const Icon(Icons.book, size: 20),
+                      label: const Text(
+                        'Abrir Manual de Autenticação',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.accent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        elevation: 4,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Links úteis
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openUsefulUrl('baidu_developer'),
+                          icon: const Icon(Icons.developer_mode, size: 16),
+                          label: const Text('Baidu Console'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.secondary,
+                            side: BorderSide(color: AppColors.secondary.withOpacity(0.5)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openUsefulUrl('google_security'),
+                          icon: const Icon(Icons.security, size: 16),
+                          label: const Text('Google Security'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.primary,
+                            side: BorderSide(color: AppColors.primary.withOpacity(0.5)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 8),
+                  
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openUsefulUrl('terabox'),
+                          icon: const Icon(Icons.cloud, size: 16),
+                          label: const Text('Terabox'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.highlight,
+                            side: BorderSide(color: AppColors.highlight.withOpacity(0.5)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: () => _openUsefulUrl('gmail_app_passwords'),
+                          icon: const Icon(Icons.email, size: 16),
+                          label: const Text('Gmail Senhas'),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppColors.error,
+                            side: BorderSide(color: AppColors.error.withOpacity(0.5)),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 12),
+                  
+                  // Status do manual
+                  FutureBuilder<bool>(
+                    future: ManualService.isManualAvailable(),
+                    builder: (context, snapshot) {
+                      if (snapshot.hasData) {
+                        return Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: snapshot.data! 
+                                ? AppColors.success.withOpacity(0.1)
+                                : AppColors.error.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: snapshot.data! 
+                                  ? AppColors.success.withOpacity(0.3)
+                                  : AppColors.error.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(
+                                snapshot.data! ? Icons.check_circle : Icons.error,
+                                color: snapshot.data! ? AppColors.success : AppColors.error,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 8),
+                              Text(
+                                snapshot.data! 
+                                    ? 'Manual disponível e pronto para uso'
+                                    : 'Manual não encontrado - verifique a instalação',
+                                style: TextStyle(
+                                  color: snapshot.data! ? AppColors.success : AppColors.error,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                ],
+              ),
+            ),
+            
+            const SizedBox(height: 24),
+            
             // Seção Informações do Sistema
             _buildSection(
               title: 'Informações do Sistema',
@@ -1579,48 +1734,90 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _openAuthenticationManual() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardColor,
-        title: Row(
-          children: [
-            Icon(Icons.help_outline, color: AppColors.accent),
-            const SizedBox(width: 8),
-            const Text(
-              'Manual de Autenticação',
-              style: TextStyle(color: AppColors.textPrimary),
+  /// Abre o manual de autenticação HTML no navegador
+  Future<void> _openAuthenticationManual() async {
+    try {
+      _updateTestOutput('📚 Abrindo Manual de Autenticação...\n\n');
+      
+      await ManualService.openAuthenticationManual();
+      
+      _updateTestOutput('📚 Manual de Autenticação aberto no navegador!\n\n'
+                       '✅ O manual HTML foi aberto com sucesso\n'
+                       '🌐 Navegue pelas abas para ver:\n'
+                       '   • 🎯 Visão Geral\n'
+                       '   • 🔐 Configuração Terabox OAuth2\n'
+                       '   • 📧 Configuração Gmail\n'
+                       '   • 🔧 Troubleshooting\n'
+                       '   • ✅ Checklist de Configuração\n\n'
+                       '📖 Manual interativo com design moderno!');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Row(
+              children: [
+                Icon(Icons.check_circle, color: Colors.white, size: 20),
+                SizedBox(width: 8),
+                Text('Manual aberto no navegador!'),
+              ],
             ),
-          ],
-        ),
-        content: const SingleChildScrollView(
-          child: Text(
-            'O manual detalhado de autenticação está disponível no arquivo:\n\n'
-            '📄 ManualdeAutenticacao.md\n\n'
-            'Este arquivo contém:\n'
-            '• Passo a passo para criar conta no Baidu\n'
-            '• Como obter Client ID e Client Secret\n'
-            '• Configuração de senha de app do Gmail\n'
-            '• Troubleshooting completo\n\n'
-            'Consulte este arquivo na raiz do projeto para instruções detalhadas.',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-            ),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 3),
           ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              'Fechar',
-              style: TextStyle(color: AppColors.accent),
-            ),
+        );
+      }
+      
+    } catch (e) {
+      _updateTestOutput('❌ Erro ao abrir manual: $e\n\n'
+                       '🔧 Possíveis soluções:\n'
+                       '   • Verifique se o arquivo manual_autenticacao.html existe\n'
+                       '   • Certifique-se de ter um navegador padrão configurado\n'
+                       '   • Tente abrir o arquivo manualmente na pasta do projeto');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erro ao abrir manual: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
           ),
-        ],
-      ),
-    );
+        );
+      }
+    }
+  }
+
+  /// Abre uma URL útil específica
+  Future<void> _openUsefulUrl(String urlKey) async {
+    try {
+      await ManualService.openUsefulUrl(urlKey);
+      
+      final urlName = {
+        'baidu_developer': 'Baidu Developer Console',
+        'google_security': 'Google Security Settings',
+        'terabox': 'Terabox',
+        'gmail_app_passwords': 'Gmail App Passwords',
+      }[urlKey] ?? 'Link';
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('🌐 $urlName aberto no navegador'),
+            backgroundColor: AppColors.info,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erro ao abrir link: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 
   @override

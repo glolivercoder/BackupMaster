@@ -1,0 +1,983 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📚 Manual de Autenticação - BackupMaster</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary-color: #4CAF50;
+            --secondary-color: #2196F3;
+            --accent-color: #FF9800;
+            --highlight-color: #00BCD4;
+            --error-color: #F44336;
+            --success-color: #4CAF50;
+            --warning-color: #FF9800;
+            
+            --bg-color: #121212;
+            --surface-color: #1E1E1E;
+            --card-color: #2C2C2C;
+            --text-primary: #FFFFFF;
+            --text-secondary: #B0B0B0;
+            --text-disabled: #757575;
+            
+            --border-radius: 12px;
+            --shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, var(--bg-color) 0%, #1a1a1a 100%);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 40px 20px;
+            background: linear-gradient(135deg, var(--primary-color), var(--secondary-color));
+            border-radius: var(--border-radius);
+            box-shadow: var(--shadow);
+        }
+
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            opacity: 0.9;
+        }
+
+        .nav-tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 30px;
+            background: var(--surface-color);
+            border-radius: var(--border-radius);
+            padding: 8px;
+            box-shadow: var(--shadow);
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            background: transparent;
+            border: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            border-radius: 8px;
+            transition: var(--transition);
+            font-size: 1rem;
+            font-weight: 500;
+        }
+
+        .nav-tab.active {
+            background: var(--primary-color);
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(76, 175, 80, 0.3);
+        }
+
+        .nav-tab:hover:not(.active) {
+            background: var(--card-color);
+            color: var(--text-primary);
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.5s ease-in-out;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--card-color);
+            border-radius: var(--border-radius);
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: var(--shadow);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: var(--transition);
+        }
+
+        .card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        }
+
+        .card h2 {
+            color: var(--primary-color);
+            margin-bottom: 20px;
+            font-size: 1.8rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .card h3 {
+            color: var(--secondary-color);
+            margin: 25px 0 15px 0;
+            font-size: 1.4rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .card h4 {
+            color: var(--accent-color);
+            margin: 20px 0 10px 0;
+            font-size: 1.2rem;
+        }
+
+        .step-list {
+            counter-reset: step-counter;
+            list-style: none;
+            padding: 0;
+        }
+
+        .step-list li {
+            counter-increment: step-counter;
+            margin-bottom: 20px;
+            padding: 20px;
+            background: var(--surface-color);
+            border-radius: 8px;
+            border-left: 4px solid var(--primary-color);
+            position: relative;
+            transition: var(--transition);
+        }
+
+        .step-list li:hover {
+            background: rgba(76, 175, 80, 0.1);
+            transform: translateX(5px);
+        }
+
+        .step-list li::before {
+            content: counter(step-counter);
+            position: absolute;
+            left: -15px;
+            top: 15px;
+            background: var(--primary-color);
+            color: white;
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+        }
+
+        .step-list li strong {
+            color: var(--primary-color);
+            display: block;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+        }
+
+        .code-block {
+            background: #0d1117;
+            border: 1px solid #30363d;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.9rem;
+            overflow-x: auto;
+            position: relative;
+        }
+
+        .code-block::before {
+            content: 'CODE';
+            position: absolute;
+            top: 8px;
+            right: 12px;
+            background: var(--accent-color);
+            color: white;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: bold;
+        }
+
+        .url-link {
+            color: var(--highlight-color);
+            text-decoration: none;
+            font-weight: 500;
+            transition: var(--transition);
+            padding: 2px 6px;
+            border-radius: 4px;
+        }
+
+        .url-link:hover {
+            background: rgba(0, 188, 212, 0.2);
+            text-decoration: underline;
+        }
+
+        .alert {
+            padding: 16px 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            border-left: 4px solid;
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+        }
+
+        .alert-warning {
+            background: rgba(255, 152, 0, 0.1);
+            border-color: var(--warning-color);
+            color: var(--warning-color);
+        }
+
+        .alert-error {
+            background: rgba(244, 67, 54, 0.1);
+            border-color: var(--error-color);
+            color: var(--error-color);
+        }
+
+        .alert-success {
+            background: rgba(76, 175, 80, 0.1);
+            border-color: var(--success-color);
+            color: var(--success-color);
+        }
+
+        .alert-info {
+            background: rgba(33, 150, 243, 0.1);
+            border-color: var(--secondary-color);
+            color: var(--secondary-color);
+        }
+
+        .checklist {
+            list-style: none;
+            padding: 0;
+        }
+
+        .checklist li {
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: var(--transition);
+        }
+
+        .checklist li:hover {
+            background: rgba(255, 255, 255, 0.05);
+            padding-left: 10px;
+            border-radius: 6px;
+        }
+
+        .checklist li::before {
+            content: '☐';
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+        }
+
+        .checklist li.checked::before {
+            content: '✅';
+        }
+
+        .table-container {
+            overflow-x: auto;
+            margin: 20px 0;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--surface-color);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        th, td {
+            padding: 15px;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        th {
+            background: var(--primary-color);
+            color: white;
+            font-weight: 600;
+        }
+
+        tr:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .icon {
+            font-size: 1.2rem;
+            margin-right: 8px;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 12px 24px;
+            background: var(--primary-color);
+            color: white;
+            text-decoration: none;
+            border-radius: 8px;
+            font-weight: 500;
+            transition: var(--transition);
+            border: none;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn:hover {
+            background: #45a049;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--secondary-color);
+        }
+
+        .btn-secondary:hover {
+            background: #1976d2;
+            box-shadow: 0 4px 12px rgba(33, 150, 243, 0.4);
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: var(--surface-color);
+            border-radius: 4px;
+            overflow: hidden;
+            margin: 20px 0;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary-color), var(--secondary-color));
+            border-radius: 4px;
+            transition: width 0.5s ease;
+        }
+
+        .floating-toc {
+            position: fixed;
+            right: 20px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: var(--card-color);
+            border-radius: var(--border-radius);
+            padding: 20px;
+            box-shadow: var(--shadow);
+            max-width: 250px;
+            z-index: 1000;
+        }
+
+        .floating-toc h4 {
+            color: var(--primary-color);
+            margin-bottom: 15px;
+            font-size: 1rem;
+        }
+
+        .floating-toc ul {
+            list-style: none;
+            padding: 0;
+        }
+
+        .floating-toc li {
+            margin-bottom: 8px;
+        }
+
+        .floating-toc a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: var(--transition);
+        }
+
+        .floating-toc a:hover {
+            color: var(--primary-color);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                padding: 10px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .nav-tabs {
+                flex-direction: column;
+                gap: 8px;
+            }
+            
+            .floating-toc {
+                display: none;
+            }
+            
+            .card {
+                padding: 20px;
+            }
+        }
+
+        .scroll-to-top {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            background: var(--primary-color);
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: var(--transition);
+            opacity: 0;
+            visibility: hidden;
+            z-index: 1000;
+        }
+
+        .scroll-to-top.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .scroll-to-top:hover {
+            background: #45a049;
+            transform: translateY(-3px);
+            box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Manual de Autenticação</h1>
+            <p>BackupMaster - Guia Completo de Configuração</p>
+        </div>
+
+        <div class="nav-tabs">
+            <button class="nav-tab active" onclick="showTab('overview')">🎯 Visão Geral</button>
+            <button class="nav-tab" onclick="showTab('terabox')">🔐 Terabox OAuth2</button>
+            <button class="nav-tab" onclick="showTab('gmail')">📧 Gmail</button>
+            <button class="nav-tab" onclick="showTab('troubleshooting')">🔧 Troubleshooting</button>
+            <button class="nav-tab" onclick="showTab('checklist')">✅ Checklist</button>
+        </div>
+
+        <!-- Visão Geral -->
+        <div id="overview" class="tab-content active">
+            <div class="card">
+                <h2><span class="icon">🎯</span>Objetivo</h2>
+                <p>Este manual fornece instruções detalhadas para configurar a autenticação OAuth2 do Terabox e a autenticação por senha de app do Gmail no BackupMaster.</p>
+                
+                <div class="progress-bar">
+                    <div class="progress-fill" style="width: 100%"></div>
+                </div>
+
+                <h3><span class="icon">🔐</span>Tipos de Autenticação</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Serviço</th>
+                                <th>Tipo de Autenticação</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>Gmail</strong></td>
+                                <td>Senha de App</td>
+                                <td><span style="color: var(--success-color);">✅ Funcional</span></td>
+                            </tr>
+                            <tr>
+                                <td><strong>Terabox</strong></td>
+                                <td>OAuth2 Real</td>
+                                <td><span style="color: var(--success-color);">✅ Implementado</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="alert alert-info">
+                    <span class="icon">ℹ️</span>
+                    <div>
+                        <strong>Importante:</strong> Ambos os serviços requerem configuração prévia antes do uso. Siga as instruções nas abas específicas.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Terabox OAuth2 -->
+        <div id="terabox" class="tab-content">
+            <div class="card">
+                <h2><span class="icon">🔐</span>Configuração do Terabox (OAuth2)</h2>
+                
+                <div class="alert alert-warning">
+                    <span class="icon">⚠️</span>
+                    <div>
+                        <strong>IMPORTANTE:</strong> Para usar o Terabox, você DEVE configurar suas credenciais OAuth2. O sistema não funcionará sem isso.
+                    </div>
+                </div>
+
+                <h3><span class="icon">📋</span>Pré-requisitos</h3>
+                <ul class="checklist">
+                    <li>Conta Google/Gmail ativa</li>
+                    <li>Acesso ao Terabox (pode usar a mesma conta Google)</li>
+                    <li>Navegador web atualizado</li>
+                </ul>
+
+                <h3><span class="icon">🚀</span>Passo 1: Criar Conta no Baidu</h3>
+                <ol class="step-list">
+                    <li>
+                        <strong>Acesse o site do Baidu:</strong>
+                        <br>URL: <a href="https://passport.baidu.com/" class="url-link" target="_blank">https://passport.baidu.com/</a>
+                        <br>Clique em "注册" (Registrar) se não tiver conta
+                    </li>
+                    <li>
+                        <strong>Registrar nova conta:</strong>
+                        <br>• Escolha "海外手机号" (Número internacional)
+                        <br>• Digite seu número de telefone com código do país (+55 para Brasil)
+                        <br>• Preencha o código de verificação recebido por SMS
+                        <br>• Crie uma senha forte
+                        <br>• Complete o cadastro
+                    </li>
+                    <li>
+                        <strong>Verificar acesso ao Terabox:</strong>
+                        <br>• Acesse: <a href="https://www.terabox.com/" class="url-link" target="_blank">https://www.terabox.com/</a>
+                        <br>• Faça login com sua conta Baidu
+                        <br>• Confirme que consegue acessar o painel
+                    </li>
+                </ol>
+
+                <h3><span class="icon">🛠️</span>Passo 2: Registrar Aplicação no Baidu Developer Console</h3>
+                <ol class="step-list">
+                    <li>
+                        <strong>Acessar o Developer Console:</strong>
+                        <br>• URL: <a href="https://developer.baidu.com/" class="url-link" target="_blank">https://developer.baidu.com/</a>
+                        <br>• Faça login com sua conta Baidu
+                        <br>• Clique em "控制台" (Console) no canto superior direito
+                    </li>
+                    <li>
+                        <strong>Criar Nova Aplicação:</strong>
+                        <br>• Clique em "创建应用" (Criar Aplicação)
+                        <br>• Preencha os dados:
+                        <div class="code-block">
+应用名称 (Nome): BackupMaster
+应用描述 (Descrição): Sistema de backup automatizado
+应用类型 (Tipo): 网页应用 (Aplicação Web)
+网站地址 (URL do Site): http://localhost:8080
+授权回调页 (URL de Callback): http://localhost:8080/callback
+                        </div>
+                    </li>
+                    <li>
+                        <strong>Configurar Permissões:</strong>
+                        <br>Na seção "接口权限" (Permissões de Interface), ative:
+                        <br>✅ <strong>basic</strong> - Informações básicas do usuário
+                        <br>✅ <strong>netdisk</strong> - Acesso ao armazenamento em nuvem
+                        <br>Clique em "保存" (Salvar)
+                    </li>
+                    <li>
+                        <strong>Obter Credenciais:</strong>
+                        <br>Após criar a aplicação, você verá:
+                        <br>• <strong>App ID</strong> (Client ID): Copie este valor
+                        <br>• <strong>App Secret</strong> (Client Secret): Copie este valor
+                        
+                        <div class="alert alert-warning">
+                            <span class="icon">⚠️</span>
+                            <div><strong>IMPORTANTE:</strong> Guarde essas credenciais em local seguro!</div>
+                        </div>
+                    </li>
+                </ol>
+
+                <h3><span class="icon">📱</span>Passo 3: Configurar no BackupMaster</h3>
+                <ol class="step-list">
+                    <li>
+                        <strong>Abrir BackupMaster:</strong>
+                        <br>• Execute o aplicativo
+                        <br>• Vá para a aba <strong>Settings</strong>
+                        <br>• Localize a seção <strong>"Configurações do Terabox (OAuth2)"</strong>
+                    </li>
+                    <li>
+                        <strong>Preencher os Campos:</strong>
+                        <br>• <strong>Email da Conta Terabox:</strong> Seu email Baidu/Google
+                        <br>• <strong>Client ID:</strong> Cole o App ID obtido no passo anterior
+                        <br>• <strong>Client Secret:</strong> Cole o App Secret obtido no passo anterior
+                    </li>
+                    <li>
+                        <strong>Salvar e Testar:</strong>
+                        <br>• Clique em <strong>"Salvar"</strong>
+                        <br>• Clique em <strong>"Autenticar"</strong>
+                        <br>• O navegador abrirá automaticamente
+                        <br>• Autorize a aplicação no Baidu
+                        <br>• Retorne ao BackupMaster para confirmar sucesso
+                    </li>
+                </ol>
+
+                <div class="alert alert-success">
+                    <span class="icon">✅</span>
+                    <div>
+                        <strong>Sucesso!</strong> Após configurar, o Terabox funcionará 100% real, sem simulações!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Gmail -->
+        <div id="gmail" class="tab-content">
+            <div class="card">
+                <h2><span class="icon">📧</span>Configuração do Gmail (Senha de App)</h2>
+
+                <h3><span class="icon">📋</span>Pré-requisitos</h3>
+                <ul class="checklist">
+                    <li>Conta Gmail ativa</li>
+                    <li>Verificação em duas etapas habilitada</li>
+                    <li>Acesso às configurações de segurança do Google</li>
+                </ul>
+
+                <h3><span class="icon">🔒</span>Passo 1: Habilitar Verificação em Duas Etapas</h3>
+                <ol class="step-list">
+                    <li>
+                        <strong>Acessar Configurações de Segurança:</strong>
+                        <br>• URL: <a href="https://myaccount.google.com/security" class="url-link" target="_blank">https://myaccount.google.com/security</a>
+                        <br>• Faça login na sua conta Google
+                        <br>• Localize a seção "Como fazer login no Google"
+                    </li>
+                    <li>
+                        <strong>Ativar Verificação em Duas Etapas:</strong>
+                        <br>• Clique em "Verificação em duas etapas"
+                        <br>• Siga o assistente de configuração:
+                        <br>&nbsp;&nbsp;- Confirme seu número de telefone
+                        <br>&nbsp;&nbsp;- Escolha método de verificação (SMS ou app)
+                        <br>&nbsp;&nbsp;- Complete a configuração
+                    </li>
+                    <li>
+                        <strong>Confirmar Ativação:</strong>
+                        <br>• Verifique se aparece "Ativada" na verificação em duas etapas
+                        <br>• Teste fazendo logout e login novamente
+                    </li>
+                </ol>
+
+                <h3><span class="icon">🔑</span>Passo 2: Gerar Senha de App</h3>
+                <ol class="step-list">
+                    <li>
+                        <strong>Acessar Senhas de App:</strong>
+                        <br>• Ainda em <a href="https://myaccount.google.com/security" class="url-link" target="_blank">https://myaccount.google.com/security</a>
+                        <br>• Role até encontrar "Senhas de app"
+                        <br>• Clique em "Senhas de app"
+                    </li>
+                    <li>
+                        <strong>Criar Nova Senha:</strong>
+                        <br>• No campo "Selecionar app", escolha <strong>"Email"</strong>
+                        <br>• No campo "Selecionar dispositivo", escolha <strong>"Outro (nome personalizado)"</strong>
+                        <br>• Digite: <code>BackupMaster</code>
+                        <br>• Clique em <strong>"Gerar"</strong>
+                    </li>
+                    <li>
+                        <strong>Copiar a Senha:</strong>
+                        <br>• Uma senha de 16 caracteres será exibida
+                        <br>• Formato: <code>abcd efgh ijkl mnop</code>
+                        
+                        <div class="alert alert-warning">
+                            <span class="icon">⚠️</span>
+                            <div><strong>COPIE IMEDIATAMENTE</strong> - não será mostrada novamente!</div>
+                        </div>
+                    </li>
+                </ol>
+
+                <h3><span class="icon">📱</span>Passo 3: Configurar no BackupMaster</h3>
+                <ol class="step-list">
+                    <li>
+                        <strong>Abrir Configurações:</strong>
+                        <br>• No BackupMaster, vá para <strong>Settings</strong>
+                        <br>• Localize <strong>"Configurações do Gmail"</strong>
+                    </li>
+                    <li>
+                        <strong>Preencher Campos:</strong>
+                        <br>• <strong>Email Remetente:</strong> Seu email Gmail completo
+                        <br>• <strong>Senha do App:</strong> Cole a senha de 16 caracteres (SEM espaços)
+                        <br>• <strong>Email Destinatário:</strong> Email que receberá os relatórios
+                    </li>
+                    <li>
+                        <strong>Testar Configuração:</strong>
+                        <br>• Clique em <strong>"Salvar"</strong>
+                        <br>• Clique em <strong>"Testar"</strong>
+                        <br>• Verifique se recebeu o email de teste
+                    </li>
+                </ol>
+
+                <div class="alert alert-success">
+                    <span class="icon">✅</span>
+                    <div>
+                        <strong>Pronto!</strong> Gmail configurado e funcionando perfeitamente!
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Troubleshooting -->
+        <div id="troubleshooting" class="tab-content">
+            <div class="card">
+                <h2><span class="icon">🔧</span>Troubleshooting</h2>
+
+                <h3><span class="icon">❌</span>Problemas Comuns - Terabox</h3>
+                
+                <h4>Erro: "Credenciais OAuth2 não configuradas"</h4>
+                <div class="alert alert-error">
+                    <span class="icon">🔍</span>
+                    <div>
+                        <strong>Causa:</strong> Client ID ou Secret vazios<br>
+                        <strong>Solução:</strong> Verifique se copiou corretamente do Baidu Console
+                    </div>
+                </div>
+
+                <h4>Erro: "Invalid client"</h4>
+                <div class="alert alert-error">
+                    <span class="icon">🔍</span>
+                    <div>
+                        <strong>Causa:</strong> Client ID incorreto<br>
+                        <strong>Solução:</strong> Confirme o App ID no Baidu Console ou recrie a aplicação
+                    </div>
+                </div>
+
+                <h4>Erro: "Unauthorized redirect_uri"</h4>
+                <div class="alert alert-error">
+                    <span class="icon">🔍</span>
+                    <div>
+                        <strong>Causa:</strong> URL de callback incorreta<br>
+                        <strong>Solução:</strong> Configure <code>http://localhost:8080/callback</code> no Baidu Console (HTTP, não HTTPS)
+                    </div>
+                </div>
+
+                <h3><span class="icon">❌</span>Problemas Comuns - Gmail</h3>
+
+                <h4>Erro: "Authentication failed"</h4>
+                <div class="alert alert-error">
+                    <span class="icon">🔍</span>
+                    <div>
+                        <strong>Causa:</strong> Senha de app incorreta<br>
+                        <strong>Solução:</strong> Gere nova senha de app e certifique-se de copiar sem espaços
+                    </div>
+                </div>
+
+                <h4>Email não chega</h4>
+                <div class="alert alert-error">
+                    <span class="icon">🔍</span>
+                    <div>
+                        <strong>Causa:</strong> Filtros de spam ou configuração<br>
+                        <strong>Solução:</strong> Verifique pasta de spam, confirme email destinatário
+                    </div>
+                </div>
+
+                <h3><span class="icon">🔍</span>Códigos de Erro Comuns</h3>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Código</th>
+                                <th>Significado</th>
+                                <th>Ação</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><strong>400</strong></td>
+                                <td>Parâmetros inválidos</td>
+                                <td>Verificar dados enviados</td>
+                            </tr>
+                            <tr>
+                                <td><strong>401</strong></td>
+                                <td>Não autorizado</td>
+                                <td>Verificar credenciais</td>
+                            </tr>
+                            <tr>
+                                <td><strong>403</strong></td>
+                                <td>Acesso negado</td>
+                                <td>Verificar permissões</td>
+                            </tr>
+                            <tr>
+                                <td><strong>404</strong></td>
+                                <td>Endpoint não encontrado</td>
+                                <td>Verificar URLs</td>
+                            </tr>
+                            <tr>
+                                <td><strong>500</strong></td>
+                                <td>Erro interno do servidor</td>
+                                <td>Tentar novamente mais tarde</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Checklist -->
+        <div id="checklist" class="tab-content">
+            <div class="card">
+                <h2><span class="icon">✅</span>Checklist de Configuração</h2>
+
+                <h3><span class="icon">🔐</span>Terabox OAuth2</h3>
+                <ul class="checklist">
+                    <li>Conta Baidu criada e verificada</li>
+                    <li>Aplicação registrada no Developer Console</li>
+                    <li>Permissões basic e netdisk ativadas</li>
+                    <li>Client ID e Secret copiados</li>
+                    <li>Campos preenchidos no BackupMaster</li>
+                    <li>Teste de autenticação bem-sucedido</li>
+                </ul>
+
+                <h3><span class="icon">📧</span>Gmail</h3>
+                <ul class="checklist">
+                    <li>Verificação em duas etapas ativada</li>
+                    <li>Senha de app gerada</li>
+                    <li>Campos preenchidos no BackupMaster</li>
+                    <li>Email de teste recebido</li>
+                    <li>Destinatário configurado corretamente</li>
+                </ul>
+
+                <h3><span class="icon">🧪</span>Teste Completo do Sistema</h3>
+                <ol class="step-list">
+                    <li>
+                        <strong>Criar Backup de Teste:</strong>
+                        <br>• Selecione uma pasta pequena
+                        <br>• Execute o backup completo
+                        <br>• Verifique se o ZIP foi criado
+                    </li>
+                    <li>
+                        <strong>Verificar Upload Terabox:</strong>
+                        <br>• Confirme se o arquivo aparece no Terabox
+                        <br>• Teste o download do link gerado
+                    </li>
+                    <li>
+                        <strong>Verificar Email:</strong>
+                        <br>• Confirme recebimento do relatório
+                        <br>• Verifique se a senha está incluída
+                        <br>• Teste abertura do ZIP com a senha
+                    </li>
+                </ol>
+
+                <div class="alert alert-success">
+                    <span class="icon">🎉</span>
+                    <div>
+                        <strong>Configuração Concluída!</strong><br>
+                        Se todos os testes passaram, sua configuração está completa! O BackupMaster agora pode:
+                        <br>• ✅ Criar backups ZIP com senhas seguras
+                        <br>• ✅ Fazer upload automático para Terabox
+                        <br>• ✅ Enviar relatórios detalhados por email
+                        <br>• ✅ Gerenciar credenciais de forma segura
+                        <br><br>
+                        <strong>Parabéns! Seu sistema de backup está totalmente funcional! 🚀</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Floating TOC -->
+    <div class="floating-toc">
+        <h4>📋 Navegação Rápida</h4>
+        <ul>
+            <li><a href="#overview" onclick="showTab('overview')">🎯 Visão Geral</a></li>
+            <li><a href="#terabox" onclick="showTab('terabox')">🔐 Terabox OAuth2</a></li>
+            <li><a href="#gmail" onclick="showTab('gmail')">📧 Gmail</a></li>
+            <li><a href="#troubleshooting" onclick="showTab('troubleshooting')">🔧 Troubleshooting</a></li>
+            <li><a href="#checklist" onclick="showTab('checklist')">✅ Checklist</a></li>
+        </ul>
+    </div>
+
+    <!-- Scroll to Top -->
+    <div class="scroll-to-top" onclick="scrollToTop()">
+        ↑
+    </div>
+
+    <script>
+        function showTab(tabName) {
+            // Hide all tab contents
+            const tabContents = document.querySelectorAll('.tab-content');
+            tabContents.forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tabs
+            const tabs = document.querySelectorAll('.nav-tab');
+            tabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to clicked tab
+            event.target.classList.add('active');
+
+            // Scroll to top
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function scrollToTop() {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Show/hide scroll to top button
+        window.addEventListener('scroll', function() {
+            const scrollButton = document.querySelector('.scroll-to-top');
+            if (window.pageYOffset > 300) {
+                scrollButton.classList.add('visible');
+            } else {
+                scrollButton.classList.remove('visible');
+            }
+        });
+
+        // Add click handlers for checklist items
+        document.addEventListener('DOMContentLoaded', function() {
+            const checklistItems = document.querySelectorAll('.checklist li');
+            checklistItems.forEach(item => {
+                item.addEventListener('click', function() {
+                    this.classList.toggle('checked');
+                });
+            });
+        });
+
+        // Add smooth scrolling for anchor links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    target.scrollIntoView({
+                        behavior: 'smooth',
+                        block: 'start'
+                    });
+                }
+            });
+        });
+    </script>
+</body>
+</html>
