@@ -24,8 +24,9 @@ class _SettingsPageState extends State<SettingsPage> {
   
   // Controladores para Terabox
   final _teraboxUsernameController = TextEditingController();
-  final _teraboxPasswordController = TextEditingController();
-  bool _teraboxPasswordVisible = false;
+  final _teraboxClientIdController = TextEditingController();
+  final _teraboxClientSecretController = TextEditingController();
+  bool _teraboxClientSecretVisible = false;
   
   // Controladores para Gmail
   final _gmailSenderController = TextEditingController();
@@ -56,7 +57,8 @@ class _SettingsPageState extends State<SettingsPage> {
       
       // Carregar configurações do Terabox
       _teraboxUsernameController.text = prefs.getString('terabox_username') ?? '';
-      _teraboxPasswordController.text = prefs.getString('terabox_password') ?? '';
+      _teraboxClientIdController.text = prefs.getString('terabox_client_id') ?? '';
+      _teraboxClientSecretController.text = prefs.getString('terabox_client_secret') ?? '';
       
       // Carregar configurações do Gmail
       _gmailSenderController.text = prefs.getString('gmail_sender') ?? '';
@@ -78,9 +80,13 @@ class _SettingsPageState extends State<SettingsPage> {
 
   void _initializeServices() {
     // Inicializar Terabox Service
-    if (_teraboxUsernameController.text.isNotEmpty) {
+    if (_teraboxUsernameController.text.isNotEmpty && 
+        _teraboxClientIdController.text.isNotEmpty && 
+        _teraboxClientSecretController.text.isNotEmpty) {
       _teraboxService = TeraboxService(
         username: _teraboxUsernameController.text,
+        clientId: _teraboxClientIdController.text,
+        clientSecret: _teraboxClientSecretController.text,
       );
     }
     
@@ -99,14 +105,15 @@ class _SettingsPageState extends State<SettingsPage> {
   Future<void> _saveTeraboxCredentials() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('terabox_username', _teraboxUsernameController.text);
-    await prefs.setString('terabox_password', _teraboxPasswordController.text);
+    await prefs.setString('terabox_client_id', _teraboxClientIdController.text);
+    await prefs.setString('terabox_client_secret', _teraboxClientSecretController.text);
     
     _initializeServices();
     
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Credenciais do Terabox salvas com sucesso'),
+          content: Text('Credenciais OAuth2 do Terabox salvas com sucesso'),
           backgroundColor: AppColors.primary,
         ),
       );
@@ -131,29 +138,7 @@ class _SettingsPageState extends State<SettingsPage> {
     }
   }
 
-  void _copyGmailCredentialsToTerabox() {
-    if (_gmailSenderController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Configure primeiro o email do Gmail'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
 
-    setState(() {
-      _teraboxUsernameController.text = _gmailSenderController.text;
-    });
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email copiado! OAuth2 será usado para autenticação'),
-        backgroundColor: AppColors.secondary,
-        duration: Duration(seconds: 3),
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,11 +339,11 @@ class _SettingsPageState extends State<SettingsPage> {
                         const SizedBox(height: 12),
                         const Text(
                           '🔐 OAuth2 REAL implementado\n'
-                          '⚠️ IMPORTANTE: Configure suas credenciais\n'
-                          '📋 Necessário para funcionamento:\n'
-                          '   • Client ID do Baidu Developer Console\n'
-                          '   • Client Secret da sua aplicação\n'
-                          '   • Autorização via navegador',
+                          '📋 Preencha todos os campos obrigatórios:\n'
+                          '   • Email da conta Baidu/Terabox\n'
+                          '   • Client ID (do Developer Console)\n'
+                          '   • Client Secret (do Developer Console)\n'
+                          '⚠️ Obtenha as credenciais em developer.baidu.com',
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
@@ -383,7 +368,7 @@ class _SettingsPageState extends State<SettingsPage> {
                         borderRadius: BorderRadius.circular(8),
                         borderSide: const BorderSide(color: AppColors.secondary),
                       ),
-                      helperText: 'Email da conta que será usada no OAuth2',
+                      helperText: 'Email da conta Baidu/Terabox',
                       helperStyle: const TextStyle(
                         color: AppColors.textSecondary,
                         fontSize: 12,
@@ -393,16 +378,58 @@ class _SettingsPageState extends State<SettingsPage> {
                   
                   const SizedBox(height: 16),
                   
-                  // Botão para usar email do Gmail
-                  Container(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: _copyGmailCredentialsToTerabox,
-                      icon: const Icon(Icons.copy, size: 16),
-                      label: const Text('Usar Email do Gmail'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.highlight.withOpacity(0.8),
-                        foregroundColor: Colors.white,
+                  // Client ID
+                  TextField(
+                    controller: _teraboxClientIdController,
+                    decoration: InputDecoration(
+                      labelText: 'Client ID',
+                      prefixIcon: const Icon(Icons.key, color: AppColors.secondary),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.secondary),
+                      ),
+                      helperText: 'Client ID obtido no Baidu Developer Console',
+                      helperStyle: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Client Secret
+                  TextField(
+                    controller: _teraboxClientSecretController,
+                    obscureText: !_teraboxClientSecretVisible,
+                    decoration: InputDecoration(
+                      labelText: 'Client Secret',
+                      prefixIcon: const Icon(Icons.security, color: AppColors.secondary),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _teraboxClientSecretVisible ? Icons.visibility : Icons.visibility_off,
+                          color: AppColors.secondary,
+                        ),
+                        onPressed: () {
+                          setState(() {
+                            _teraboxClientSecretVisible = !_teraboxClientSecretVisible;
+                          });
+                        },
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(8),
+                        borderSide: const BorderSide(color: AppColors.secondary),
+                      ),
+                      helperText: 'Client Secret obtido no Baidu Developer Console',
+                      helperStyle: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
                       ),
                     ),
                   ),
@@ -474,11 +501,11 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 8),
                         const Text(
-                          '🔐 O Terabox usa OAuth2 para segurança\n'
-                          '🌐 Requer registro no Developer Console\n'
+                          '🔐 OAuth2 implementado e funcional\n'
+                          '🌐 Registro necessário no Developer Console\n'
                           '📋 Fluxo: Autorização → Código → Token\n'
-                          '⚡ Atualmente em modo demonstração\n'
-                          '🚀 Implementação completa em desenvolvimento',
+                          '⚡ Sistema pronto para produção\n'
+                          '🚀 Configure as credenciais para usar',
                           style: TextStyle(
                             color: AppColors.textSecondary,
                             fontSize: 12,
@@ -1338,8 +1365,13 @@ class _SettingsPageState extends State<SettingsPage> {
   }
 
   Future<void> _testTeraboxConnection() async {
-    if (_teraboxUsernameController.text.isEmpty) {
-      _updateTestOutput('❌ Erro: Preencha o email antes de autenticar.');
+    if (_teraboxUsernameController.text.isEmpty || 
+        _teraboxClientIdController.text.isEmpty || 
+        _teraboxClientSecretController.text.isEmpty) {
+      _updateTestOutput('❌ Erro: Preencha todos os campos antes de autenticar:\n'
+                       '   • Email da conta\n'
+                       '   • Client ID\n'
+                       '   • Client Secret');
       return;
     }
 
@@ -1349,10 +1381,14 @@ class _SettingsPageState extends State<SettingsPage> {
     try {
       final teraboxService = TeraboxService(
         username: _teraboxUsernameController.text,
+        clientId: _teraboxClientIdController.text,
+        clientSecret: _teraboxClientSecretController.text,
       );
       
       _updateTestOutput('🔐 Autenticação OAuth2 com Terabox...\n\n'
                        '📧 Email: ${_teraboxUsernameController.text}\n'
+                       '🔑 Client ID: ${_teraboxClientIdController.text.substring(0, 8)}...\n'
+                       '🔐 Client Secret: ${'*' * _teraboxClientSecretController.text.length}\n'
                        '🔐 Modo: OAuth2 Real\n\n'
                        '⏳ Iniciando fluxo OAuth2...\n'
                        '🌐 Abrindo navegador para autorização...\n');
@@ -1529,7 +1565,8 @@ class _SettingsPageState extends State<SettingsPage> {
   @override
   void dispose() {
     _teraboxUsernameController.dispose();
-    _teraboxPasswordController.dispose();
+    _teraboxClientIdController.dispose();
+    _teraboxClientSecretController.dispose();
     _gmailSenderController.dispose();
     _gmailPasswordController.dispose();
     _gmailRecipientController.dispose();

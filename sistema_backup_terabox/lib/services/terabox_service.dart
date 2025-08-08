@@ -24,26 +24,38 @@ class TeraboxService {
   final String _authUrl = 'https://openapi.baidu.com/oauth/2.0/authorize';
   final String _tokenUrl = 'https://openapi.baidu.com/oauth/2.0/token';
   
-  // Credenciais OAuth2 - VOCÊ PRECISA REGISTRAR SUA APLICAÇÃO
-  static const String _clientId = 'YOUR_CLIENT_ID'; // Substitua pelo seu Client ID
-  static const String _clientSecret = 'YOUR_CLIENT_SECRET'; // Substitua pelo seu Client Secret
+  // URLs e configurações OAuth2
   static const String _redirectUri = 'http://localhost:8080/callback';
   static const List<String> _scopes = ['basic', 'netdisk'];
 
-  oauth2.Client? _oauthClient;
+  // Credenciais OAuth2 dinâmicas
+  String? _clientId;
+  String? _clientSecret;
   String? _username;
+  
+  oauth2.Client? _oauthClient;
   HttpServer? _callbackServer;
 
   TeraboxService({
     String? username,
+    String? clientId,
+    String? clientSecret,
   }) {
     _username = username;
+    _clientId = clientId;
+    _clientSecret = clientSecret;
   }
 
-  /// Configura o username para o Terabox
-  void setUsername(String username) {
-    _username = username;
-    _logger.i('👤 Username do Terabox configurado: $username');
+  /// Configura as credenciais OAuth2 do Terabox
+  void setCredentials({
+    String? username,
+    String? clientId,
+    String? clientSecret,
+  }) {
+    if (username != null) _username = username;
+    if (clientId != null) _clientId = clientId;
+    if (clientSecret != null) _clientSecret = clientSecret;
+    _logger.i('🔐 Credenciais OAuth2 configuradas');
   }
 
   /// Autentica no Terabox usando OAuth2 REAL
@@ -58,13 +70,14 @@ class TeraboxService {
       }
 
       // Verificar se as credenciais estão configuradas
-      if (_clientId == 'YOUR_CLIENT_ID' || _clientSecret == 'YOUR_CLIENT_SECRET') {
+      if (_clientId == null || _clientSecret == null || 
+          _clientId!.isEmpty || _clientSecret!.isEmpty) {
         _logger.e('❌ ERRO: Client ID e Client Secret não configurados!');
         _logger.e('📋 Para usar o Terabox, você precisa:');
         _logger.e('   1. Acessar https://developer.baidu.com/');
         _logger.e('   2. Criar uma aplicação');
         _logger.e('   3. Obter Client ID e Client Secret');
-        _logger.e('   4. Substituir as constantes no código');
+        _logger.e('   4. Configurar nas configurações do app');
         throw Exception('Credenciais OAuth2 não configuradas');
       }
 
@@ -72,10 +85,10 @@ class TeraboxService {
       
       // Criar grant OAuth2
       final grant = oauth2.AuthorizationCodeGrant(
-        _clientId,
+        _clientId!,
         Uri.parse(_authUrl),
         Uri.parse(_tokenUrl),
-        secret: _clientSecret,
+        secret: _clientSecret!,
       );
 
       // Gerar URL de autorização

@@ -40,11 +40,15 @@ class BackupService {
       
       // Inicializar Terabox
       final teraboxUsername = prefs.getString('terabox_username');
-      final teraboxPassword = prefs.getString('terabox_password');
+      final teraboxClientId = prefs.getString('terabox_client_id');
+      final teraboxClientSecret = prefs.getString('terabox_client_secret');
       
-      if (teraboxUsername != null && teraboxUsername.isNotEmpty) {
+      if (teraboxUsername != null && teraboxClientId != null && teraboxClientSecret != null &&
+          teraboxUsername.isNotEmpty && teraboxClientId.isNotEmpty && teraboxClientSecret.isNotEmpty) {
         _teraboxService = TeraboxService(
           username: teraboxUsername,
+          clientId: teraboxClientId,
+          clientSecret: teraboxClientSecret,
         );
         _logger.i('🔧 Terabox Service inicializado');
       }
