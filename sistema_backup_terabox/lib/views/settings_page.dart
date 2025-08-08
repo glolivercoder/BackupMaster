@@ -511,6 +511,23 @@ class _SettingsPageState extends State<SettingsPage> {
                             fontSize: 12,
                           ),
                         ),
+                        
+                        const SizedBox(height: 12),
+                        
+                        // Botão Manual de Autenticação
+                        Container(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: _openAuthenticationManual,
+                            icon: const Icon(Icons.help_outline, size: 16),
+                            label: const Text('Manual de Autenticação'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.accent.withOpacity(0.8),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -1560,6 +1577,50 @@ class _SettingsPageState extends State<SettingsPage> {
     } finally {
       _setTestLoading(false);
     }
+  }
+
+  void _openAuthenticationManual() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardColor,
+        title: Row(
+          children: [
+            Icon(Icons.help_outline, color: AppColors.accent),
+            const SizedBox(width: 8),
+            const Text(
+              'Manual de Autenticação',
+              style: TextStyle(color: AppColors.textPrimary),
+            ),
+          ],
+        ),
+        content: const SingleChildScrollView(
+          child: Text(
+            'O manual detalhado de autenticação está disponível no arquivo:\n\n'
+            '📄 ManualdeAutenticacao.md\n\n'
+            'Este arquivo contém:\n'
+            '• Passo a passo para criar conta no Baidu\n'
+            '• Como obter Client ID e Client Secret\n'
+            '• Configuração de senha de app do Gmail\n'
+            '• Troubleshooting completo\n\n'
+            'Consulte este arquivo na raiz do projeto para instruções detalhadas.',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 14,
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Fechar',
+              style: TextStyle(color: AppColors.accent),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
