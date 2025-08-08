@@ -5,8 +5,12 @@ import 'package:crypto/crypto.dart';
 import 'package:path/path.dart' as p;
 import 'package:logger/logger.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:drift/drift.dart';
 import 'database.dart';
 import 'password_manager.dart';
+import 'terabox_service.dart';
+import 'gmail_service.dart';
 
 class BackupService {
   static final Logger _logger = Logger(
@@ -22,8 +26,48 @@ class BackupService {
 
   final AppDatabase _database;
   final PasswordManager _passwordManager;
+  TeraboxService? _teraboxService;
+  GmailService? _gmailService;
 
-  BackupService(this._database, this._passwordManager);
+  BackupService(this._database, this._passwordManager) {
+    _initializeServices();
+  }
+
+  /// Inicializa os serviços de Terabox e Gmail com as credenciais salvas
+  Future<void> _initializeServices() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      
+      // Inicializar Terabox
+      final teraboxUsername = prefs.getString('terabox_username');
+      final teraboxPassword = prefs.getString('terabox_password');
+      
+      if (teraboxUsername != null && teraboxUsername.isNotEmpty) {
+        _teraboxService = TeraboxService(
+          username: teraboxUsername,
+        );
+        _logger.i('🔧 Terabox Service inicializado');
+      }
+      
+      // Inicializar Gmail
+      final gmailSender = prefs.getString('gmail_sender');
+      final gmailPassword = prefs.getString('gmail_password');
+      final gmailRecipient = prefs.getString('gmail_recipient');
+      
+      if (gmailSender != null && gmailPassword != null && gmailRecipient != null &&
+          gmailSender.isNotEmpty && gmailPassword.isNotEmpty && gmailRecipient.isNotEmpty) {
+        _gmailService = GmailService(
+          senderEmail: gmailSender,
+          senderPassword: gmailPassword,
+          recipientEmail: gmailRecipient,
+        );
+        _logger.i('📧 Gmail Service inicializado');
+      }
+      
+    } catch (e) {
+      _logger.w('⚠️ Erro ao inicializar serviços: $e');
+    }
+  }
 
   /// Cria um arquivo ZIP com senha do diretório especificado
   Future<String> createZipWithPassword(
@@ -425,13 +469,229 @@ class BackupService {
       }
 
       // Atualizar status no banco
-      await _database.updateBackupStatus(backupId, BackupStatus.deleted);
+      await _database.updateBackupStatus(backupId, 'deleted');
       
       _logger.i('✅ Backup deletado com sucesso');
       
     } catch (e) {
       _logger.e('❌ Erro ao deletar backup: $e');
       rethrow;
+    }
+  }
+
+  /// Cria backup completo com upload para Terabox e envio de email
+  Future<String> createCompleteBackup(
+    String sourceDir, {
+    Function(String)? onStatusUpdate,
+    Function(double)? onProgress,
+    String? customMessage,
+  }) async {
+    final backupId = DateTime.now().millisecondsSinceEpoch.toString();
+    
+    _logger.i('🚀 Iniciando backup completo para: $sourceDir');
+    _logger.i('🆔 Backup ID: $backupId');
+    
+    try {
+      // Reinicializar serviços para garantir credenciais atualizadas
+      await _initializeServices();
+      
+      // 1. Gerar senha segura
+      onStatusUpdate?.call('🔐 Gerando senha segura...');
+      final password = _passwordManager.generateSecurePassword();
+      await _passwordManager.storePassword(backupId, password);
+      _logger.i('🔐 Senha gerada e armazenada');
+      
+      // 2. Criar registro no banco
+      onStatusUpdate?.call('💾 Criando registro no banco de dados...');
+      await _database.insertBackup(BackupsCompanion.insert(
+        id: backupId,
+        name: p.basename(sourceDir),
+        originalPath: sourceDir,
+        passwordHash: _passwordManager.generatePasswordHash(password),
+        status: const Value('in_progress'),
+      ));
+      
+      // 3. Criar arquivo ZIP
+      onStatusUpdate?.call('📦 Criando arquivo ZIP...');
+      final zipPath = await createZipWithPassword(
+        sourceDir,
+        backupId,
+        password,
+        onProgress: (progress) {
+          onProgress?.call(progress * 0.6); // 60% do progresso total
+        },
+      );
+      
+      // 4. Calcular checksum e tamanho
+      onStatusUpdate?.call('🔍 Calculando checksum...');
+      final checksum = await calculateChecksum(zipPath);
+      final fileSize = await getFileSize(zipPath);
+      
+      // 5. Atualizar registro com informações do ZIP
+      final backup = await _database.getBackupById(backupId);
+      if (backup != null) {
+        await _database.updateBackup(backup.copyWith(
+          zipPath: Value(zipPath),
+          checksum: Value(checksum),
+          fileSize: Value(fileSize),
+        ));
+      }
+      
+      String? teraboxUrl;
+      
+      // 6. Upload para Terabox (se configurado)
+      if (_teraboxService != null) {
+        try {
+          onStatusUpdate?.call('☁️ Fazendo upload para Terabox...');
+          
+          // Autenticar se necessário
+          if (!_teraboxService!.isAuthenticated) {
+            await _teraboxService!.authenticate();
+          }
+          
+          // Upload com progresso
+          teraboxUrl = await _teraboxService!.uploadFile(
+            zipPath,
+            onProgress: (progress) {
+              onProgress?.call(0.6 + (progress * 0.3)); // 30% do progresso total
+            },
+          );
+          
+          // Atualizar registro com URL do Terabox
+          final updatedBackup = await _database.getBackupById(backupId);
+          if (updatedBackup != null) {
+            await _database.updateBackup(updatedBackup.copyWith(
+              teraboxUrl: Value(teraboxUrl),
+            ));
+          }
+          
+          _logger.i('☁️ Upload para Terabox concluído: $teraboxUrl');
+          
+        } catch (e) {
+          _logger.e('❌ Erro no upload para Terabox: $e');
+          onStatusUpdate?.call('⚠️ Erro no upload para Terabox, continuando...');
+        }
+      } else {
+        _logger.w('⚠️ Terabox não configurado, pulando upload');
+        onStatusUpdate?.call('⚠️ Terabox não configurado');
+      }
+      
+      // 7. Enviar email (se configurado)
+      if (_gmailService != null) {
+        try {
+          onStatusUpdate?.call('📧 Enviando notificação por email...');
+          
+          final finalBackup = await _database.getBackupById(backupId);
+          if (finalBackup != null) {
+            await _gmailService!.sendNewBackupNotification(
+              backup: finalBackup,
+              password: password,
+              teraboxUrl: teraboxUrl ?? 'Upload não realizado',
+            );
+            
+            _logger.i('📧 Email de notificação enviado');
+          }
+          
+        } catch (e) {
+          _logger.e('❌ Erro ao enviar email: $e');
+          onStatusUpdate?.call('⚠️ Erro ao enviar email, continuando...');
+        }
+      } else {
+        _logger.w('⚠️ Gmail não configurado, pulando envio de email');
+        onStatusUpdate?.call('⚠️ Gmail não configurado');
+      }
+      
+      // 8. Finalizar backup
+      onStatusUpdate?.call('✅ Finalizando backup...');
+      await _database.updateBackupStatus(backupId, 'completed');
+      
+      onProgress?.call(1.0); // 100% concluído
+      onStatusUpdate?.call('🎉 Backup concluído com sucesso!');
+      
+      _logger.i('🎉 Backup completo finalizado com sucesso!');
+      _logger.i('📦 Arquivo: $zipPath');
+      _logger.i('🔐 Senha: $password');
+      if (teraboxUrl != null) {
+        _logger.i('☁️ Terabox: $teraboxUrl');
+      }
+      
+      return backupId;
+      
+    } catch (e) {
+      _logger.e('❌ Erro durante backup completo: $e');
+      
+      // Atualizar status para erro
+      try {
+        await _database.updateBackupStatus(backupId, 'failed');
+      } catch (dbError) {
+        _logger.e('❌ Erro ao atualizar status de falha: $dbError');
+      }
+      
+      onStatusUpdate?.call('❌ Erro durante backup: $e');
+      rethrow;
+    }
+  }
+
+  /// Envia relatório de backups por email
+  Future<bool> sendBackupReport({
+    String? customMessage,
+    int? lastDays,
+  }) async {
+    if (_gmailService == null) {
+      _logger.w('⚠️ Gmail não configurado');
+      return false;
+    }
+    
+    _logger.i('📧 Enviando relatório de backups...');
+    
+    try {
+      // Obter backups (últimos N dias ou todos)
+      List<Backup> backups;
+      if (lastDays != null) {
+        final cutoffDate = DateTime.now().subtract(Duration(days: lastDays));
+        backups = await _database.getBackupsSince(cutoffDate);
+      } else {
+        backups = await getAllBackups();
+      }
+      
+      final success = await _gmailService!.sendBackupReport(
+        backups: backups,
+        database: _database,
+        passwordManager: _passwordManager,
+        customMessage: customMessage,
+      );
+      
+      if (success) {
+        _logger.i('✅ Relatório enviado com sucesso');
+      } else {
+        _logger.e('❌ Falha ao enviar relatório');
+      }
+      
+      return success;
+      
+    } catch (e) {
+      _logger.e('❌ Erro ao enviar relatório: $e');
+      return false;
+    }
+  }
+
+  /// Verifica se os serviços estão configurados
+  bool get isTeraboxConfigured => _teraboxService != null;
+  bool get isGmailConfigured => _gmailService != null;
+  
+  /// Obtém informações de quota do Terabox
+  Future<TeraboxQuota?> getTeraboxQuota() async {
+    if (_teraboxService == null) return null;
+    
+    try {
+      if (!_teraboxService!.isAuthenticated) {
+        await _teraboxService!.authenticate();
+      }
+      
+      return await _teraboxService!.getQuotaInfo();
+    } catch (e) {
+      _logger.e('❌ Erro ao obter quota do Terabox: $e');
+      return null;
     }
   }
 }

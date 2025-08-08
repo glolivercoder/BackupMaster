@@ -71,7 +71,7 @@ class BackupViewModel extends ChangeNotifier {
       return;
     }
 
-    _logger.i('🚀 Iniciando criação de backup para: $_selectedDirectory');
+    _logger.i('🚀 Iniciando criação de backup completo para: $_selectedDirectory');
     
     _isLoading = true;
     _progress = 0.0;
@@ -79,56 +79,23 @@ class BackupViewModel extends ChangeNotifier {
     notifyListeners();
 
     try {
-      // Gerar ID único para o backup
-      _currentBackupId = 'backup_${DateTime.now().millisecondsSinceEpoch}';
-      
-      // Etapa 1: Gerar senha
-      _updateProgress(0.1, 'Gerando senha segura...');
-      final password = _passwordManager.generateSecurePassword();
-      await _passwordManager.storePassword(_currentBackupId!, password);
-      
-      // Etapa 2: Criar arquivo ZIP
-      _updateProgress(0.3, 'Criando arquivo ZIP...');
-      final zipPath = await _backupService.createZipWithPassword(
+      // Usar o novo método createCompleteBackup que integra Terabox e Gmail
+      _currentBackupId = await _backupService.createCompleteBackup(
         _selectedDirectory!,
-        _currentBackupId!,
-        password,
+        onStatusUpdate: (status) {
+          _statusMessage = status;
+          notifyListeners();
+          _logger.d('📊 Status: $status');
+        },
         onProgress: (progress) {
-          _updateProgress(0.3 + (progress * 0.4), 'Compactando arquivos... ${(progress * 100).toInt()}%');
+          _progress = progress;
+          notifyListeners();
+          _logger.d('📊 Progresso: ${(progress * 100).toInt()}%');
         },
       );
       
-      // Etapa 3: Calcular checksum
-      _updateProgress(0.7, 'Calculando checksum...');
-      final checksum = await _backupService.calculateChecksum(zipPath);
-      
-      // Etapa 4: Salvar no banco de dados
-      _updateProgress(0.8, 'Salvando informações...');
-      await _database.insertBackup(BackupsCompanion.insert(
-        id: _currentBackupId!,
-        name: _backupService.generateBackupName(_getDirectoryName(_selectedDirectory!)),
-        originalPath: _selectedDirectory!,
-        zipPath: Value(zipPath),
-        passwordHash: _passwordManager.generatePasswordHash(password),
-        fileSize: Value(await _backupService.getFileSize(zipPath)),
-        checksum: Value(checksum),
-      ));
-      
-      // Etapa 5: Upload para Terabox (simulado por enquanto)
-      _updateProgress(0.9, 'Enviando para Terabox...');
-      await Future.delayed(const Duration(seconds: 2)); // Simular upload
-      
-      // Etapa 6: Enviar email (simulado por enquanto)
-      _updateProgress(0.95, 'Enviando notificação por email...');
-      await Future.delayed(const Duration(seconds: 1)); // Simular email
-      
-      // Finalizar
-      _updateProgress(1.0, 'Backup concluído com sucesso!');
-      
-      _logger.i('✅ Backup criado com sucesso!');
+      _logger.i('✅ Backup completo criado com sucesso!');
       _logger.i('   📁 Diretório: $_selectedDirectory');
-      _logger.i('   📦 Arquivo ZIP: $zipPath');
-      _logger.i('   🔐 Senha: $password');
       _logger.i('   🆔 ID: $_currentBackupId');
       
       // Aguardar um pouco para mostrar a mensagem de sucesso
@@ -174,6 +141,57 @@ class BackupViewModel extends ChangeNotifier {
       _logger.w('⚠️ Backup cancelado pelo usuário');
       _resetState();
     }
+  }
+
+  /// Verifica se os serviços estão configurados
+  bool get isTeraboxConfigured => _backupService.isTeraboxConfigured;
+  bool get isGmailConfigured => _backupService.isGmailConfigured;
+
+  /// Envia relatório de backups por email
+  Future<bool> sendBackupReport({String? customMessage}) async {
+    if (!isGmailConfigured) {
+      _logger.w('⚠️ Gmail não configurado');
+      return false;
+    }
+
+    _logger.i('📧 Enviando relatório de backups...');
+    
+    try {
+      final success = await _backupService.sendBackupReport(
+        customMessage: customMessage,
+        lastDays: 30, // Últimos 30 dias
+      );
+      
+      if (success) {
+        _logger.i('✅ Relatório enviado com sucesso');
+      } else {
+        _logger.e('❌ Falha ao enviar relatório');
+      }
+      
+      return success;
+      
+    } catch (e) {
+      _logger.e('❌ Erro ao enviar relatório: $e');
+      return false;
+    }
+  }
+
+  /// Obtém informações de quota do Terabox
+  Future<String?> getTeraboxQuotaInfo() async {
+    if (!isTeraboxConfigured) {
+      return null;
+    }
+
+    try {
+      final quota = await _backupService.getTeraboxQuota();
+      if (quota != null) {
+        return '${quota.formattedUsed} / ${quota.formattedTotal} (${quota.usagePercentage.toStringAsFixed(1)}%)';
+      }
+    } catch (e) {
+      _logger.e('❌ Erro ao obter quota: $e');
+    }
+    
+    return null;
   }
 
   @override

@@ -47,6 +47,10 @@ dependencies:
   # Networking & HTTP
   http: ^1.1.0
   
+  # OAuth2 & Authentication
+  oauth2: ^2.0.2
+  url_launcher: ^6.2.2
+  
   # Email
   mailer: ^6.0.1
   
@@ -63,9 +67,6 @@ dependencies:
   
   # UI Icons
   cupertino_icons: ^1.0.8
-  
-  # Process launching
-  url_launcher: ^6.2.2
 
 dev_dependencies:
   flutter_test:

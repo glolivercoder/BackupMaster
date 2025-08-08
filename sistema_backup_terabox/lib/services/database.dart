@@ -116,10 +116,10 @@ class AppDatabase extends _$AppDatabase {
     return result;
   }
 
-  Future<bool> updateBackupStatus(String id, BackupStatus status) async {
-    _logger.i('🔄 Atualizando status do backup $id para: ${status.displayName}');
+  Future<bool> updateBackupStatus(String id, String status) async {
+    _logger.i('🔄 Atualizando status do backup $id para: $status');
     final result = await (update(backups)..where((b) => b.id.equals(id)))
-        .write(BackupsCompanion(status: Value(status.name)));
+        .write(BackupsCompanion(status: Value(status)));
     final success = result > 0;
     if (success) {
       _logger.i('✅ Status atualizado com sucesso!');
@@ -194,6 +194,43 @@ class AppDatabase extends _$AppDatabase {
     final logs = await (select(emailLogs)..where((e) => e.backupId.equals(backupId))).get();
     _logger.d('📧 Encontrados ${logs.length} logs de email');
     return logs;
+  }
+
+  // Métodos adicionais para integração com Terabox e Gmail
+  Future<bool> updateBackup(Backup backup) async {
+    _logger.i('🔄 Atualizando backup: ${backup.id}');
+    final result = await update(backups).replace(backup);
+    final success = result;
+    if (success) {
+      _logger.i('✅ Backup atualizado com sucesso!');
+    } else {
+      _logger.e('❌ Falha ao atualizar backup');
+    }
+    return success;
+  }
+
+  Future<List<Backup>> getBackupsSince(DateTime date) async {
+    _logger.d('📋 Buscando backups desde: $date');
+    final backupList = await (select(backups)..where((b) => b.createdAt.isBiggerOrEqualValue(date))).get();
+    _logger.d('📋 Encontrados ${backupList.length} backups desde $date');
+    return backupList;
+  }
+
+  Future<List<Backup>> getBackupsByStatus(String status) async {
+    _logger.d('📋 Buscando backups com status: $status');
+    final backupList = await (select(backups)..where((b) => b.status.equals(status))).get();
+    _logger.d('📋 Encontrados ${backupList.length} backups com status $status');
+    return backupList;
+  }
+
+  Future<List<Backup>> getRecentBackups({int limit = 10}) async {
+    _logger.d('📋 Buscando os $limit backups mais recentes...');
+    final backupList = await (select(backups)
+          ..orderBy([(b) => OrderingTerm.desc(b.createdAt)])
+          ..limit(limit))
+        .get();
+    _logger.d('📋 Encontrados ${backupList.length} backups recentes');
+    return backupList;
   }
 
   // Método para backup do banco de dados

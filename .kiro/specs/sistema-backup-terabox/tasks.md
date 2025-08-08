@@ -77,7 +77,8 @@
   - Adicionar informações de nome, tamanho e status
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
 
-- [ ] 10. Implementar integração com Terabox API
+- [x] 10. Implementar integração com Terabox API
+
   - Criar TeraboxAPI service para autenticação e upload
   - Implementar upload de arquivos ZIP para Terabox
   - Adicionar sistema de retry (3 tentativas) para uploads falhados
@@ -85,7 +86,8 @@
   - Implementar notificação de erro em caso de falha definitiva
   - _Requirements: 2.1, 2.2, 2.3, 2.4_
 
-- [ ] 11. Desenvolver sistema de envio de emails
+- [x] 11. Desenvolver sistema de envio de emails
+
   - Criar EmailService usando package mailer para Gmail
   - Implementar geração de lista HTML de backups com senhas
   - Configurar SMTP para Gmail com autenticação
@@ -93,7 +95,8 @@
   - Criar template de email com formatação clara e organizada
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 12. Criar página de configurações
+- [x] 12. Criar página de configurações
+
   - Implementar SettingsPage para configurações de Terabox e Gmail
   - Criar SettingsViewModel para gerenciar configurações
   - Adicionar campos para credenciais do Terabox
@@ -101,7 +104,9 @@
   - Adicionar teste de conexão para ambos os serviços
   - _Requirements: 2.1, 3.1_
 
-- [ ] 13. Integrar fluxo completo de backup
+- [x] 13. Integrar fluxo completo de backup
+
+
   - Conectar criação de ZIP → upload Terabox → envio de email
   - Implementar atualização de status durante todo o processo
   - Adicionar tratamento de erros em cada etapa
