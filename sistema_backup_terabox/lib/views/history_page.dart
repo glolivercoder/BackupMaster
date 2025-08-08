@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
-import '../viewmodels/search_viewmodel.dart';
+import '../viewmodels/history_viewmodel.dart';
 import '../utils/app_theme.dart';
 
-class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
+class HistoryPage extends StatefulWidget {
+  const HistoryPage({super.key});
 
   @override
-  State<SearchPage> createState() => _SearchPageState();
+  State<HistoryPage> createState() => _HistoryPageState();
 }
 
-class _SearchPageState extends State<SearchPage> {
+class _HistoryPageState extends State<HistoryPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
@@ -27,7 +27,7 @@ class _SearchPageState extends State<SearchPage> {
     return Scaffold(
       body: Column(
         children: [
-          // SearchBar no topo
+          // Header com barra de busca
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -40,11 +40,38 @@ class _SearchPageState extends State<SearchPage> {
                 ),
               ],
             ),
-            child: Consumer<SearchViewModel>(
-              builder: (context, searchVM, child) {
+            child: Consumer<HistoryViewModel>(
+              builder: (context, historyVM, child) {
                 return Column(
                   children: [
-                    // Campo de busca principal
+                    // Título e estatísticas
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.history,
+                          color: AppColors.primary,
+                          size: 28,
+                        ),
+                        const SizedBox(width: 12),
+                        const Text(
+                          'Histórico de Backups',
+                          style: TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        const Spacer(),
+                        _buildStatsChip(
+                          'Total: ${historyVM.totalBackups}',
+                          AppColors.primary,
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Barra de busca
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.cardColor,
@@ -62,7 +89,7 @@ class _SearchPageState extends State<SearchPage> {
                           fontSize: 16,
                         ),
                         decoration: InputDecoration(
-                          hintText: 'Buscar backups...',
+                          hintText: 'Buscar no histórico...',
                           hintStyle: const TextStyle(
                             color: AppColors.textSecondary,
                           ),
@@ -78,7 +105,8 @@ class _SearchPageState extends State<SearchPage> {
                                   ),
                                   onPressed: () {
                                     _searchController.clear();
-                                    searchVM.clearSearch();
+                                    historyVM.searchHistory('');
+                                    setState(() {});
                                   },
                                 )
                               : null,
@@ -89,43 +117,59 @@ class _SearchPageState extends State<SearchPage> {
                           ),
                         ),
                         onChanged: (query) {
-                          searchVM.searchBackups(query);
-                          setState(() {}); // Para atualizar o suffixIcon
+                          historyVM.searchHistory(query);
+                          setState(() {});
                         },
                       ),
                     ),
                     
-                    // Sugestões de autocompletar
-                    if (_searchController.text.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      Container(
-                        constraints: const BoxConstraints(maxHeight: 120),
-                        child: _buildSuggestions(searchVM),
-                      ),
-                    ],
+                    const SizedBox(height: 12),
+                    
+                    // Filtros e ordenação
+                    Row(
+                      children: [
+                        // Filtro
+                        Expanded(
+                          child: _buildFilterDropdown(historyVM),
+                        ),
+                        const SizedBox(width: 12),
+                        // Ordenação
+                        Expanded(
+                          child: _buildSortDropdown(historyVM),
+                        ),
+                        const SizedBox(width: 12),
+                        // Botão refresh
+                        IconButton(
+                          onPressed: () {
+                            historyVM.loadHistory();
+                          },
+                          icon: Icon(
+                            Icons.refresh,
+                            color: AppColors.primary,
+                          ),
+                          tooltip: 'Atualizar',
+                        ),
+                      ],
+                    ),
                   ],
                 );
               },
             ),
           ),
           
-          // Resultados da busca
+          // Lista de backups
           Expanded(
-            child: Consumer<SearchViewModel>(
-              builder: (context, searchVM, child) {
-                if (searchVM.currentQuery.isEmpty) {
-                  return _buildEmptyState();
-                }
-                
-                if (searchVM.isSearching) {
+            child: Consumer<HistoryViewModel>(
+              builder: (context, historyVM, child) {
+                if (historyVM.isLoading) {
                   return _buildLoadingState();
                 }
                 
-                if (searchVM.searchResults.isEmpty) {
-                  return _buildNoResultsState();
+                if (historyVM.filteredBackups.isEmpty) {
+                  return _buildEmptyState();
                 }
                 
-                return _buildSearchResults(searchVM);
+                return _buildBackupsList(historyVM);
               },
             ),
           ),
@@ -134,80 +178,96 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildSuggestions(SearchViewModel searchVM) {
-    final suggestions = searchVM.getFilteredSuggestions(_searchController.text);
-    
-    if (suggestions.isEmpty) {
-      return const SizedBox.shrink();
-    }
-    
+  Widget _buildStatsChip(String text, Color color) {
     return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       decoration: BoxDecoration(
-        color: AppColors.cardColor,
-        borderRadius: BorderRadius.circular(8),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.2),
+          color: color.withOpacity(0.3),
           width: 1,
         ),
       ),
-      child: ListView.builder(
-        shrinkWrap: true,
-        itemCount: suggestions.length,
-        itemBuilder: (context, index) {
-          final suggestion = suggestions[index];
-          return ListTile(
-            dense: true,
-            leading: Icon(
-              Icons.history,
-              color: AppColors.textSecondary,
-              size: 18,
-            ),
-            title: Text(
-              suggestion,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 14,
-              ),
-            ),
-            onTap: () {
-              _searchController.text = suggestion;
-              searchVM.searchBackups(suggestion);
-              _searchFocusNode.unfocus();
-            },
-          );
-        },
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color,
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+        ),
       ),
     );
   }
 
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.search,
-            size: 64,
-            color: AppColors.textSecondary.withOpacity(0.5),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Digite algo para buscar',
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 18,
-            ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'Você pode buscar por nome do backup\nou caminho do diretório',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textSecondary,
-              fontSize: 14,
-            ),
-          ),
-        ],
+  Widget _buildFilterDropdown(HistoryViewModel historyVM) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.secondary.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<FilterOption>(
+          value: historyVM.currentFilter,
+          dropdownColor: AppColors.cardColor,
+          style: const TextStyle(color: AppColors.textPrimary),
+          icon: Icon(Icons.filter_list, color: AppColors.secondary),
+          items: FilterOption.values.map((filter) {
+            return DropdownMenuItem(
+              value: filter,
+              child: Text(
+                filter.displayName,
+                style: const TextStyle(fontSize: 14),
+              ),
+            );
+          }).toList(),
+          onChanged: (filter) {
+            if (filter != null) {
+              historyVM.setFilterOption(filter);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSortDropdown(HistoryViewModel historyVM) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      decoration: BoxDecoration(
+        color: AppColors.cardColor,
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: AppColors.highlight.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<SortOption>(
+          value: historyVM.currentSort,
+          dropdownColor: AppColors.cardColor,
+          style: const TextStyle(color: AppColors.textPrimary),
+          icon: Icon(Icons.sort, color: AppColors.highlight),
+          items: SortOption.values.map((sort) {
+            return DropdownMenuItem(
+              value: sort,
+              child: Text(
+                sort.displayName,
+                style: const TextStyle(fontSize: 14),
+              ),
+            );
+          }).toList(),
+          onChanged: (sort) {
+            if (sort != null) {
+              historyVM.setSortOption(sort);
+            }
+          },
+        ),
       ),
     );
   }
@@ -222,7 +282,7 @@ class _SearchPageState extends State<SearchPage> {
           ),
           SizedBox(height: 16),
           Text(
-            'Buscando...',
+            'Carregando histórico...',
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 16,
@@ -233,13 +293,13 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildNoResultsState() {
+  Widget _buildEmptyState() {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(
-            Icons.search_off,
+            Icons.history_outlined,
             size: 64,
             color: AppColors.textSecondary.withOpacity(0.5),
           ),
@@ -252,10 +312,10 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Tente buscar por "${_searchController.text}" com outros termos',
+          const Text(
+            'Crie seu primeiro backup na aba Início',
             textAlign: TextAlign.center,
-            style: const TextStyle(
+            style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 14,
             ),
@@ -265,28 +325,28 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildSearchResults(SearchViewModel searchVM) {
+  Widget _buildBackupsList(HistoryViewModel historyVM) {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: searchVM.searchResults.length,
+      itemCount: historyVM.filteredBackups.length,
       itemBuilder: (context, index) {
-        final backup = searchVM.searchResults[index];
+        final backup = historyVM.filteredBackups[index];
         return FutureBuilder(
-          future: searchVM.getBackupDetails(backup),
+          future: historyVM.getBackupHistoryItem(backup),
           builder: (context, snapshot) {
             if (!snapshot.hasData) {
-              return _buildLoadingResultCard();
+              return _buildLoadingCard();
             }
             
-            final result = snapshot.data!;
-            return _buildResultCard(result, searchVM);
+            final item = snapshot.data!;
+            return _buildBackupCard(item, historyVM);
           },
         );
       },
     );
   }
 
-  Widget _buildLoadingResultCard() {
+  Widget _buildLoadingCard() {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -312,28 +372,28 @@ class _SearchPageState extends State<SearchPage> {
     );
   }
 
-  Widget _buildResultCard(BackupSearchResult result, SearchViewModel searchVM) {
+  Widget _buildBackupCard(BackupHistoryItem item, HistoryViewModel historyVM) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       decoration: BoxDecoration(
         color: AppColors.cardColor,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.2),
+          color: item.statusColor.withOpacity(0.3),
           width: 1,
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header com nome e data
+          // Header com nome, status e data
           Padding(
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
                 Icon(
-                  Icons.archive,
-                  color: AppColors.primary,
+                  item.statusIcon,
+                  color: item.statusColor,
                   size: 20,
                 ),
                 const SizedBox(width: 8),
@@ -342,7 +402,7 @@ class _SearchPageState extends State<SearchPage> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        result.backup.name,
+                        item.backup.name,
                         style: const TextStyle(
                           color: AppColors.textPrimary,
                           fontSize: 16,
@@ -351,7 +411,7 @@ class _SearchPageState extends State<SearchPage> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        result.formattedDate,
+                        item.formattedDate,
                         style: const TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 12,
@@ -360,13 +420,34 @@ class _SearchPageState extends State<SearchPage> {
                     ],
                   ),
                 ),
-                Text(
-                  result.formattedSize,
-                  style: const TextStyle(
-                    color: AppColors.highlight,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w500,
-                  ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      item.formattedSize,
+                      style: const TextStyle(
+                        color: AppColors.highlight,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: item.statusColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        item.backup.status.toUpperCase(),
+                        style: TextStyle(
+                          color: item.statusColor,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -385,7 +466,7 @@ class _SearchPageState extends State<SearchPage> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    result.backup.originalPath,
+                    item.backup.originalPath,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
@@ -401,7 +482,7 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                   onPressed: () async {
                     try {
-                      await searchVM.openOriginalDirectory(result.backup.originalPath);
+                      await historyVM.openOriginalDirectory(item.backup.originalPath);
                     } catch (e) {
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -442,7 +523,7 @@ class _SearchPageState extends State<SearchPage> {
                 Expanded(
                   child: GestureDetector(
                     onTap: () async {
-                      await searchVM.copyPasswordToClipboard(result.backup.id);
+                      await Clipboard.setData(ClipboardData(text: item.password));
                       
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -471,7 +552,7 @@ class _SearchPageState extends State<SearchPage> {
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Text(
-                            result.password,
+                            item.password,
                             style: const TextStyle(
                               color: AppColors.accent,
                               fontSize: 13,
@@ -505,7 +586,7 @@ class _SearchPageState extends State<SearchPage> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       try {
-                        await searchVM.openBackupFileWithPasswordDialog(context, result.backup.id);
+                        await historyVM.openBackupFileWithPasswordDialog(context, item.backup.id);
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -540,7 +621,7 @@ class _SearchPageState extends State<SearchPage> {
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       try {
-                        await searchVM.openOriginalDirectory(result.backup.originalPath);
+                        await historyVM.openOriginalDirectory(item.backup.originalPath);
                       } catch (e) {
                         if (mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -570,7 +651,77 @@ class _SearchPageState extends State<SearchPage> {
                     ),
                   ),
                 ),
+                const SizedBox(width: 12),
+                IconButton(
+                  onPressed: () {
+                    _showDeleteDialog(context, item, historyVM);
+                  },
+                  icon: Icon(
+                    Icons.delete_outline,
+                    color: AppColors.error,
+                    size: 20,
+                  ),
+                  tooltip: 'Deletar backup',
+                ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showDeleteDialog(BuildContext context, BackupHistoryItem item, HistoryViewModel historyVM) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppColors.cardColor,
+        title: const Text(
+          'Deletar Backup',
+          style: TextStyle(color: AppColors.textPrimary),
+        ),
+        content: Text(
+          'Tem certeza que deseja deletar o backup "${item.backup.name}"?\n\nEsta ação não pode ser desfeita.',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text(
+              'Cancelar',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              try {
+                await historyVM.deleteBackup(item.backup.id);
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Backup deletado com sucesso'),
+                      backgroundColor: AppColors.primary,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Erro ao deletar backup: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+            ),
+            child: const Text(
+              'Deletar',
+              style: TextStyle(color: Colors.white),
             ),
           ),
         ],

@@ -227,22 +227,150 @@ class BackupService {
 
       final zipFile = File(backup.zipPath ?? '');
       if (!await zipFile.exists()) {
-        throw Exception('Arquivo ZIP não encontrado');
+        throw Exception('Arquivo ZIP não encontrado: ${backup.zipPath}');
       }
 
       // Recuperar senha
       final password = await _passwordManager.retrievePassword(backupId);
       
-      // No Windows, podemos usar o comando start para abrir o arquivo
-      // Por enquanto, vamos apenas logar a ação
       _logger.i('🔓 Abrindo arquivo: ${backup.zipPath}');
       _logger.i('🔐 Senha: $password');
       
-      // TODO: Implementar abertura real do arquivo com senha
-      // Isso pode ser feito usando Process.run ou url_launcher
+      // Tentar diferentes métodos para abrir o arquivo
+      bool success = false;
+      
+      // Método 1: Usar explorer com caminho completo
+      try {
+        final result = await Process.run(
+          'C:\\Windows\\explorer.exe',
+          [backup.zipPath!],
+          runInShell: false,
+        );
+        
+        if (result.exitCode == 0) {
+          success = true;
+          _logger.i('✅ Arquivo ZIP aberto com explorer.exe');
+        }
+      } catch (e) {
+        _logger.w('⚠️ Método 1 falhou: $e');
+      }
+      
+      // Método 2: Usar cmd com start
+      if (!success) {
+        try {
+          final result = await Process.run(
+            'cmd',
+            ['/c', 'start', '', backup.zipPath!],
+            runInShell: true,
+          );
+          
+          if (result.exitCode == 0) {
+            success = true;
+            _logger.i('✅ Arquivo ZIP aberto com cmd start');
+          }
+        } catch (e) {
+          _logger.w('⚠️ Método 2 falhou: $e');
+        }
+      }
+      
+      // Método 3: Usar PowerShell
+      if (!success) {
+        try {
+          final result = await Process.run(
+            'powershell',
+            ['-Command', 'Invoke-Item', '"${backup.zipPath!}"'],
+            runInShell: true,
+          );
+          
+          if (result.exitCode == 0) {
+            success = true;
+            _logger.i('✅ Arquivo ZIP aberto com PowerShell');
+          }
+        } catch (e) {
+          _logger.w('⚠️ Método 3 falhou: $e');
+        }
+      }
+      
+      if (!success) {
+        throw Exception('Não foi possível abrir o arquivo ZIP. Senha: $password');
+      }
       
     } catch (e) {
       _logger.e('❌ Erro ao abrir ZIP: $e');
+      rethrow;
+    }
+  }
+
+  /// Abre um diretório no explorador do Windows
+  Future<void> openDirectory(String directoryPath) async {
+    _logger.i('📁 Abrindo diretório: $directoryPath');
+    
+    try {
+      final directory = Directory(directoryPath);
+      if (!await directory.exists()) {
+        throw Exception('Diretório não encontrado: $directoryPath');
+      }
+
+      bool success = false;
+      
+      // Método 1: Usar explorer com caminho completo
+      try {
+        final result = await Process.run(
+          'C:\\Windows\\explorer.exe',
+          [directoryPath],
+          runInShell: false,
+        );
+        
+        if (result.exitCode == 0) {
+          success = true;
+          _logger.i('✅ Diretório aberto com explorer.exe');
+        }
+      } catch (e) {
+        _logger.w('⚠️ Método 1 falhou: $e');
+      }
+      
+      // Método 2: Usar cmd com start
+      if (!success) {
+        try {
+          final result = await Process.run(
+            'cmd',
+            ['/c', 'start', '', directoryPath],
+            runInShell: true,
+          );
+          
+          if (result.exitCode == 0) {
+            success = true;
+            _logger.i('✅ Diretório aberto com cmd start');
+          }
+        } catch (e) {
+          _logger.w('⚠️ Método 2 falhou: $e');
+        }
+      }
+      
+      // Método 3: Usar PowerShell
+      if (!success) {
+        try {
+          final result = await Process.run(
+            'powershell',
+            ['-Command', 'Invoke-Item', '"$directoryPath"'],
+            runInShell: true,
+          );
+          
+          if (result.exitCode == 0) {
+            success = true;
+            _logger.i('✅ Diretório aberto com PowerShell');
+          }
+        } catch (e) {
+          _logger.w('⚠️ Método 3 falhou: $e');
+        }
+      }
+      
+      if (!success) {
+        throw Exception('Não foi possível abrir o diretório');
+      }
+      
+    } catch (e) {
+      _logger.e('❌ Erro ao abrir diretório: $e');
       rethrow;
     }
   }

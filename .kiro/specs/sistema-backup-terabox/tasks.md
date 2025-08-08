@@ -156,15 +156,19 @@
   - Mostrar resultados com backup, senha e caminho original
   - Implementar cópia automática da senha para clipboard ao clicar
   - Adicionar ícones e formatação visual dos resultados
+
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 20. Criar aba Settings completa
+
   - Mover todos os testes de senha para Settings
   - Implementar seção de diagnósticos do sistema
   - Criar visualizador de logs da aplicação
   - Adicionar configurações de Terabox e Gmail
   - Implementar teste de conectividade
   - Criar seção de backup e restauração de configurações
+
+
   - _Requirements: 7.1, 6.5_
 
 - [ ] 21. Implementar aba Histórico

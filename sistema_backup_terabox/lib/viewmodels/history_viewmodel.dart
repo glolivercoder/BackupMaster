@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:logger/logger.dart';
 import '../services/database.dart';
 import '../services/password_manager.dart';
 import '../services/backup_service.dart';
+import '../utils/app_theme.dart';
 
 enum SortOption {
   dateDesc('Data (Mais recente)'),
@@ -229,13 +231,118 @@ class HistoryViewModel extends ChangeNotifier {
     }
   }
 
+  /// Abre o arquivo ZIP e mostra a senha em um diálogo
+  Future<void> openBackupFileWithPasswordDialog(BuildContext context, String backupId) async {
+    try {
+      final password = await _passwordManager.retrievePassword(backupId);
+      
+      // Mostrar diálogo com a senha antes de abrir
+      final shouldOpen = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          backgroundColor: AppColors.cardColor,
+          title: const Text(
+            'Abrir Backup ZIP',
+            style: TextStyle(color: AppColors.textPrimary),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Senha do arquivo ZIP:',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: AppColors.accent.withOpacity(0.3),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        password,
+                        style: const TextStyle(
+                          color: AppColors.accent,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.copy,
+                        color: AppColors.accent,
+                        size: 20,
+                      ),
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: password));
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Senha copiada!'),
+                            backgroundColor: AppColors.primary,
+                            duration: Duration(seconds: 1),
+                          ),
+                        );
+                      },
+                      tooltip: 'Copiar senha',
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'A senha foi copiada para a área de transferência. Deseja abrir o arquivo ZIP?',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text(
+                'Cancelar',
+                style: TextStyle(color: AppColors.textSecondary),
+              ),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+              ),
+              child: const Text(
+                'Abrir ZIP',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ],
+        ),
+      );
+
+      if (shouldOpen == true) {
+        await openBackupFile(backupId);
+      }
+      
+    } catch (e) {
+      _logger.e('❌ Erro ao abrir backup com diálogo: $e');
+      rethrow;
+    }
+  }
+
   /// Abre o diretório original
   Future<void> openOriginalDirectory(String originalPath) async {
     _logger.i('📁 Abrindo diretório: $originalPath');
     
     try {
-      // TODO: Implementar abertura do diretório
-      _logger.i('🔗 Caminho: $originalPath');
+      await _backupService.openDirectory(originalPath);
       
     } catch (e) {
       _logger.e('❌ Erro ao abrir diretório: $e');
