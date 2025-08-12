@@ -66,11 +66,14 @@ class AppDatabase extends _$AppDatabase {
       lineLength: 120,
       colors: true,
       printEmojis: true,
-      printTime: true,
+      dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
     ),
   );
 
   AppDatabase() : super(_openConnection());
+  
+  // Construtor para testes
+  AppDatabase._testConstructor(super.executor);
 
   @override
   int get schemaVersion => 1;

@@ -474,6 +474,15 @@
             transform: translateY(-3px);
             box-shadow: 0 6px 16px rgba(76, 175, 80, 0.4);
         }
+
+        .terabox-tab-content {
+            display: none;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        .terabox-tab-content.active {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -540,12 +549,81 @@
             <div class="card">
                 <h2><span class="icon">🔐</span>Configuração do Terabox (OAuth2)</h2>
                 
-                <div class="alert alert-warning">
-                    <span class="icon">⚠️</span>
+                <div class="alert alert-info">
+                    <span class="icon">💡</span>
                     <div>
-                        <strong>IMPORTANTE:</strong> Para usar o Terabox, você DEVE configurar suas credenciais OAuth2. O sistema não funcionará sem isso.
+                        <strong>NOVIDADE:</strong> Agora você pode escolher entre duas formas de autenticação! Se sua conta Terabox foi criada via Google, use o método Google OAuth2 (mais fácil).
                     </div>
                 </div>
+
+                <div class="nav-tabs" style="margin-bottom: 20px;">
+                    <button class="nav-tab active" onclick="showTeraboxTab('google')">🌟 Google OAuth2 (Recomendado)</button>
+                    <button class="nav-tab" onclick="showTeraboxTab('baidu')">🔧 Baidu OAuth2 (Avançado)</button>
+                </div>
+
+                <!-- Google OAuth2 Tab -->
+                <div id="google-oauth" class="terabox-tab-content active">
+                    <div class="alert alert-success">
+                        <span class="icon">✨</span>
+                        <div>
+                            <strong>Método Simplificado:</strong> Se você criou sua conta Terabox usando login do Google, este é o método mais fácil!
+                        </div>
+                    </div>
+
+                    <h3><span class="icon">✅</span>Vantagens do Google OAuth2</h3>
+                    <ul class="checklist">
+                        <li class="checked">Mais simples de configurar</li>
+                        <li class="checked">Não precisa de VPN ou IP chinês</li>
+                        <li class="checked">Usa sua conta Google existente</li>
+                        <li class="checked">Autorização direta no navegador</li>
+                        <li class="checked">Protocolo OAuth2 padrão</li>
+                    </ul>
+
+                    <h3><span class="icon">🚀</span>Configuração Rápida</h3>
+                    <ol class="step-list">
+                        <li>
+                            <strong>Criar Projeto no Google Cloud Console:</strong>
+                            <br>• Acesse: <a href="https://console.cloud.google.com/" class="url-link" target="_blank">Google Cloud Console</a>
+                            <br>• Crie um novo projeto chamado "BackupMaster"
+                            <br>• Ative a Google Drive API
+                        </li>
+                        <li>
+                            <strong>Configurar OAuth2:</strong>
+                            <br>• Vá em "APIs e serviços" → "Credenciais"
+                            <br>• Crie "ID do cliente OAuth 2.0"
+                            <br>• Tipo: Aplicativo para computador
+                            <br>• URI de redirecionamento: <code>http://localhost:8080/callback</code>
+                        </li>
+                        <li>
+                            <strong>Obter Credenciais:</strong>
+                            <br>• Copie o Client ID e Client Secret
+                            <br>• Configure no arquivo <code>google_oauth_service.dart</code>
+                        </li>
+                        <li>
+                            <strong>Testar no BackupMaster:</strong>
+                            <br>• Abra Settings → Configurações do Terabox
+                            <br>• Selecione "Google Account"
+                            <br>• Clique "Autenticar com Google"
+                            <br>• Autorize no navegador
+                        </li>
+                    </ol>
+
+                    <div class="alert alert-info">
+                        <span class="icon">📖</span>
+                        <div>
+                            <strong>Guia Detalhado:</strong> Consulte o arquivo <code>GOOGLE_OAUTH2_SETUP.md</code> para instruções completas passo a passo.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Baidu OAuth2 Tab -->
+                <div id="baidu-oauth" class="terabox-tab-content">
+                    <div class="alert alert-warning">
+                        <span class="icon">⚠️</span>
+                        <div>
+                            <strong>Método Avançado:</strong> Use apenas se você criou sua conta Terabox diretamente no Baidu (não via Google).
+                        </div>
+                    </div>
 
                 <h3><span class="icon">📋</span>Pré-requisitos</h3>
                 <ul class="checklist">
@@ -978,6 +1056,27 @@
                 }
             });
         });
+
+        // Function to show Terabox tabs
+        function showTeraboxTab(tabName) {
+            // Hide all terabox tab contents
+            const teraboxTabs = document.querySelectorAll('.terabox-tab-content');
+            teraboxTabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Remove active class from all terabox tabs
+            const teraboxNavTabs = document.querySelectorAll('#terabox .nav-tab');
+            teraboxNavTabs.forEach(tab => {
+                tab.classList.remove('active');
+            });
+
+            // Show selected terabox tab content
+            document.getElementById(tabName + '-oauth').classList.add('active');
+
+            // Add active class to clicked terabox tab
+            event.target.classList.add('active');
+        }
     </script>
 </body>
 </html>

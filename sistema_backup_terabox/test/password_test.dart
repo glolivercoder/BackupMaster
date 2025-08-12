@@ -5,7 +5,7 @@ import 'package:drift/native.dart';
 import 'package:logger/logger.dart';
 
 void main() {
-  late AppDatabase database;
+  late TestAppDatabase database;
   late PasswordManager passwordManager;
   late Logger logger;
 
@@ -17,14 +17,14 @@ void main() {
         lineLength: 120,
         colors: true,
         printEmojis: true,
-        printTime: true,
+        dateTimeFormat: DateTimeFormat.onlyTimeAndSinceStart,
       ),
     );
   });
 
   setUp(() async {
     // Criar banco de dados em memória para testes
-    database = AppDatabase.forTesting(NativeDatabase.memory());
+    database = TestAppDatabase();
     passwordManager = PasswordManager(database);
     
     logger.i('🧪 Configurando ambiente de teste...');
@@ -309,16 +309,9 @@ void main() {
   });
 }
 
-// Extensão para criar banco de teste
-extension AppDatabaseTesting on AppDatabase {
-  static AppDatabase forTesting(QueryExecutor executor) {
-    return AppDatabase._(executor);
-  }
-}
-
-class AppDatabase extends _$AppDatabase {
-  AppDatabase._(QueryExecutor executor) : super(executor);
+// Classe de banco de dados para testes
+class TestAppDatabase extends AppDatabase {
+  TestAppDatabase() : super._testConstructor(NativeDatabase.memory());
   
-  @override
-  int get schemaVersion => 1;
+  TestAppDatabase._testConstructor(super.executor) : super._testConstructor();
 }

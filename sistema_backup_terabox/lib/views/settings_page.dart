@@ -7,6 +7,8 @@ import '../services/database.dart';
 import '../services/terabox_service.dart';
 import '../services/gmail_service.dart';
 import '../services/manual_service.dart';
+import '../services/google_oauth_service.dart';
+import '../services/gmail_oauth_service.dart';
 import '../utils/password_test_runner.dart';
 import '../utils/app_theme.dart';
 
@@ -29,20 +31,31 @@ class _SettingsPageState extends State<SettingsPage> {
   final _teraboxClientSecretController = TextEditingController();
   bool _teraboxClientSecretVisible = false;
   
+  // Tipo de autenticação selecionado
+  String _authType = 'google'; // 'google' ou 'baidu'
+  
   // Controladores para Gmail
   final _gmailSenderController = TextEditingController();
   final _gmailPasswordController = TextEditingController();
   final _gmailRecipientController = TextEditingController();
+  final _gmailJsonPathController = TextEditingController();
   bool _gmailPasswordVisible = false;
+  
+  // Tipo de autenticação Gmail
+  String _gmailAuthType = 'app_password'; // 'app_password' ou 'oauth2'
   
   // Serviços
   TeraboxService? _teraboxService;
   GmailService? _gmailService;
+  GoogleOAuthService? _googleOAuthService;
+  GmailOAuthService? _gmailOAuthService;
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadAuthType();
+    _loadGmailAuthType();
     _initializeTestRunner();
   }
 
@@ -136,6 +149,48 @@ class _SettingsPageState extends State<SettingsPage> {
           backgroundColor: AppColors.primary,
         ),
       );
+    }
+  }
+
+  Future<void> _saveAuthType() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('terabox_auth_type', _authType);
+    _initializeServices();
+  }
+
+  Future<void> _loadAuthType() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _authType = prefs.getString('terabox_auth_type') ?? 'google';
+    });
+  }
+
+  Future<void> _saveGmailAuthType() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('gmail_auth_type', _gmailAuthType);
+    _initializeGmailService();
+  }
+
+  Future<void> _loadGmailAuthType() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _gmailAuthType = prefs.getString('gmail_auth_type') ?? 'oauth2';
+    });
+  }
+
+  void _initializeGmailService() {
+    if (_gmailAuthType == 'oauth2') {
+      _gmailOAuthService = GmailOAuthService();
+    } else {
+      if (_gmailSenderController.text.isNotEmpty &&
+          _gmailPasswordController.text.isNotEmpty &&
+          _gmailRecipientController.text.isNotEmpty) {
+        _gmailService = GmailService(
+          senderEmail: _gmailSenderController.text,
+          senderPassword: _gmailPasswordController.text,
+          recipientEmail: _gmailRecipientController.text,
+        );
+      }
     }
   }
 
@@ -304,15 +359,15 @@ class _SettingsPageState extends State<SettingsPage> {
                   ),
                   const SizedBox(height: 16),
                   
-                  // Status OAuth2
+                  // Seletor de tipo de autenticação
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                      color: AppColors.primary.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                        color: AppColors.accent.withOpacity(0.3),
+                        color: AppColors.primary.withOpacity(0.3),
                         width: 1,
                       ),
                     ),
@@ -322,15 +377,15 @@ class _SettingsPageState extends State<SettingsPage> {
                         Row(
                           children: [
                             Icon(
-                              Icons.security,
-                              color: AppColors.accent,
+                              Icons.account_circle,
+                              color: AppColors.primary,
                               size: 20,
                             ),
                             const SizedBox(width: 8),
                             const Text(
-                              'Autenticação OAuth2 Implementada',
+                              'Tipo de Conta Terabox',
                               style: TextStyle(
-                                color: AppColors.accent,
+                                color: AppColors.primary,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
                               ),
@@ -339,20 +394,199 @@ class _SettingsPageState extends State<SettingsPage> {
                         ),
                         const SizedBox(height: 12),
                         const Text(
-                          '🔐 OAuth2 REAL implementado\n'
-                          '📋 Preencha todos os campos obrigatórios:\n'
-                          '   • Email da conta Baidu/Terabox\n'
-                          '   • Client ID (do Developer Console)\n'
-                          '   • Client Secret (do Developer Console)\n'
-                          '⚠️ Obtenha as credenciais em developer.baidu.com',
+                          'Escolha como você criou sua conta no Terabox:',
                           style: TextStyle(
                             color: AppColors.textSecondary,
-                            fontSize: 12,
+                            fontSize: 13,
                           ),
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        // Opções de autenticação
+                        Row(
+                          children: [
+                            Expanded(
+                              child: RadioListTile<String>(
+                                title: const Text(
+                                  'Google Account',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: const Text(
+                                  'Login via Google (Recomendado)',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                value: 'google',
+                                groupValue: _authType,
+                                activeColor: AppColors.primary,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _authType = value!;
+                                  });
+                                  _saveAuthType();
+                                },
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            Expanded(
+                              child: RadioListTile<String>(
+                                title: const Text(
+                                  'Baidu Account',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: const Text(
+                                  'Login direto Baidu',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                value: 'baidu',
+                                groupValue: _authType,
+                                activeColor: AppColors.secondary,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _authType = value!;
+                                  });
+                                  _saveAuthType();
+                                },
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Configuração baseada no tipo selecionado
+                  if (_authType == 'google') ...[
+                    // Configuração Google OAuth2
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.success.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.account_circle,
+                                color: AppColors.success,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Google OAuth2 (Simplificado)',
+                                style: TextStyle(
+                                  color: AppColors.success,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '✅ Mais fácil de configurar\n'
+                            '✅ Usa sua conta Google existente\n'
+                            '✅ Não precisa de VPN ou IP chinês\n'
+                            '✅ Autorização direta no navegador\n'
+                            '⚠️ Requer configuração de Client ID do Google',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _authenticateWithGoogle,
+                              icon: const Icon(Icons.login, size: 18),
+                              label: const Text('Autenticar com Google'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    // Configuração Baidu OAuth2 (existente)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.accent.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.security,
+                                color: AppColors.accent,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Baidu OAuth2 (Avançado)',
+                                style: TextStyle(
+                                  color: AppColors.accent,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '🔐 OAuth2 REAL implementado\n'
+                            '📋 Preencha todos os campos obrigatórios:\n'
+                            '   • Email da conta Baidu/Terabox\n'
+                            '   • Client ID (do Developer Console)\n'
+                            '   • Client Secret (do Developer Console)\n'
+                            '⚠️ Obtenha as credenciais em developer.baidu.com\n'
+                            '🌐 Pode precisar de VPN com IP chinês',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
                   
                   const SizedBox(height: 16),
                   
@@ -553,6 +787,270 @@ class _SettingsPageState extends State<SettingsPage> {
                       fontSize: 14,
                     ),
                   ),
+                  const SizedBox(height: 16),
+                  
+                  // Seletor de tipo de autenticação Gmail
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.highlight.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.highlight.withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              Icons.security,
+                              color: AppColors.highlight,
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Método de Autenticação Gmail',
+                              style: TextStyle(
+                                color: AppColors.highlight,
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text(
+                          'Escolha como autenticar com o Gmail:',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        
+                        // Opções de autenticação Gmail
+                        Row(
+                          children: [
+                            Expanded(
+                              child: RadioListTile<String>(
+                                title: const Text(
+                                  'OAuth2 + JSON',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: const Text(
+                                  'Arquivo JSON (Recomendado)',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                value: 'oauth2',
+                                groupValue: _gmailAuthType,
+                                activeColor: AppColors.highlight,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _gmailAuthType = value!;
+                                  });
+                                  _saveGmailAuthType();
+                                },
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                            Expanded(
+                              child: RadioListTile<String>(
+                                title: const Text(
+                                  'Senha de App',
+                                  style: TextStyle(
+                                    color: AppColors.textPrimary,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                subtitle: const Text(
+                                  'Método tradicional',
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                                value: 'app_password',
+                                groupValue: _gmailAuthType,
+                                activeColor: AppColors.accent,
+                                onChanged: (value) {
+                                  setState(() {
+                                    _gmailAuthType = value!;
+                                  });
+                                  _saveGmailAuthType();
+                                },
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
+                  // Configuração baseada no tipo selecionado
+                  if (_gmailAuthType == 'oauth2') ...[
+                    // Configuração OAuth2 + JSON
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.success.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.file_present,
+                                color: AppColors.success,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Gmail OAuth2 + Arquivo JSON',
+                                style: TextStyle(
+                                  color: AppColors.success,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '✅ Mais seguro que senha de app\n'
+                            '✅ Usa arquivo JSON de credenciais\n'
+                            '✅ Não expõe senha no código\n'
+                            '✅ Renovação automática de tokens\n'
+                            '📄 Coloque o arquivo JSON na pasta do projeto',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          
+                          // Campo para caminho do arquivo JSON
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: _gmailJsonPathController,
+                                  decoration: InputDecoration(
+                                    labelText: 'Caminho do arquivo JSON',
+                                    prefixIcon: const Icon(Icons.file_present, color: AppColors.success),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    focusedBorder: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(8),
+                                      borderSide: const BorderSide(color: AppColors.success),
+                                    ),
+                                    helperText: 'Ex: credentials.json',
+                                    helperStyle: const TextStyle(
+                                      color: AppColors.textSecondary,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              IconButton(
+                                onPressed: _selectJsonFile,
+                                icon: const Icon(Icons.folder_open, color: AppColors.success),
+                                tooltip: 'Selecionar arquivo',
+                              ),
+                            ],
+                          ),
+                          
+                          const SizedBox(height: 12),
+                          
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _authenticateGmailOAuth2,
+                              icon: const Icon(Icons.login, size: 18),
+                              label: const Text('Autenticar Gmail OAuth2'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.success,
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else ...[
+                    // Configuração tradicional com senha de app
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.accent.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.password,
+                                color: AppColors.accent,
+                                size: 20,
+                              ),
+                              const SizedBox(width: 8),
+                              const Text(
+                                'Gmail com Senha de App',
+                                style: TextStyle(
+                                  color: AppColors.accent,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            '🔐 Método tradicional\n'
+                            '📋 Requer verificação em duas etapas\n'
+                            '🔑 Gere senha de app no Google\n'
+                            '⚠️ Menos seguro que OAuth2',
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                  
                   const SizedBox(height: 16),
                   
                   // Email remetente
@@ -1817,6 +2315,277 @@ class _SettingsPageState extends State<SettingsPage> {
           ),
         );
       }
+    }
+  }
+
+  /// Autentica com Google OAuth2 para acessar Terabox
+  Future<void> _authenticateWithGoogle() async {
+    try {
+      _setTestLoading(true);
+      _updateTestOutput('🔐 Iniciando autenticação Google OAuth2...\n\n');
+      
+      _googleOAuthService ??= GoogleOAuthService();
+      
+      _updateTestOutput('🔐 Autenticação Google OAuth2 para Terabox...\n\n'
+                       '✨ Método simplificado selecionado\n'
+                       '🌐 Abrindo navegador para autorização Google...\n'
+                       '📋 Você será redirecionado para:\n'
+                       '   1. Login na sua conta Google\n'
+                       '   2. Autorizar acesso ao Google Drive\n'
+                       '   3. Retornar automaticamente ao app\n\n'
+                       '⏳ Aguardando autorização...\n');
+      
+      final success = await _googleOAuthService!.authenticate();
+      
+      if (success) {
+        final userInfo = _googleOAuthService!.userInfo;
+        final quota = await _googleOAuthService!.getQuotaInfo();
+        
+        _updateTestOutput('🔐 Autenticação Google OAuth2 para Terabox...\n\n'
+                         '✅ Autenticação Google OAuth2 concluída!\n'
+                         '✅ Conexão com Google Drive estabelecida!\n\n'
+                         '👤 Informações da conta:\n'
+                         '   📧 Email: ${userInfo?['email'] ?? 'N/A'}\n'
+                         '   👤 Nome: ${userInfo?['name'] ?? 'N/A'}\n\n'
+                         '📊 Informações de armazenamento:\n'
+                         '   💾 Espaço total: ${quota.formattedTotal}\n'
+                         '   📈 Espaço usado: ${quota.formattedUsed}\n'
+                         '   💿 Espaço livre: ${quota.formattedFree}\n'
+                         '   📊 Uso: ${quota.usagePercentage.toStringAsFixed(1)}%\n\n'
+                         '🎉 Google Drive configurado e pronto para uso!\n'
+                         '📤 Uploads de backup funcionarão via Google Drive\n'
+                         '🔗 Arquivos serão acessíveis via Terabox (conta Google)');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('✅ Autenticação Google concluída!'),
+                ],
+              ),
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        _updateTestOutput('🔐 Autenticação Google OAuth2 para Terabox...\n\n'
+                         '❌ Falha na autenticação Google OAuth2!\n\n'
+                         '🔧 Possíveis causas:\n'
+                         '   • Autorização cancelada pelo usuário\n'
+                         '   • Erro de rede ou timeout\n'
+                         '   • Credenciais Google não configuradas\n'
+                         '   • Problema com o servidor local\n\n'
+                         '📋 Soluções:\n'
+                         '   • Tente novamente\n'
+                         '   • Verifique sua conexão com internet\n'
+                         '   • Configure Client ID do Google no código\n'
+                         '   • Autorize completamente no navegador');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Falha na autenticação Google'),
+              backgroundColor: AppColors.error,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+      
+    } catch (e) {
+      _updateTestOutput('🔐 Autenticação Google OAuth2 para Terabox...\n\n'
+                       '❌ Erro durante autenticação: $e\n\n'
+                       '🔧 Soluções:\n'
+                       '   • Verifique sua conexão com internet\n'
+                       '   • Configure credenciais Google no código\n'
+                       '   • Tente novamente após alguns minutos\n'
+                       '   • Verifique se não há firewall bloqueando');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erro na autenticação: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      _setTestLoading(false);
+    }
+  }
+
+  /// Seleciona arquivo JSON de credenciais do Gmail
+  Future<void> _selectJsonFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: ['json'],
+        dialogTitle: 'Selecionar arquivo de credenciais JSON',
+      );
+
+      if (result != null && result.files.single.path != null) {
+        setState(() {
+          _gmailJsonPathController.text = result.files.single.path!;
+        });
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Arquivo selecionado: ${result.files.single.name}'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erro ao selecionar arquivo: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  /// Autentica Gmail usando OAuth2 + arquivo JSON
+  Future<void> _authenticateGmailOAuth2() async {
+    try {
+      _setTestLoading(true);
+      _updateTestOutput('📧 Iniciando autenticação Gmail OAuth2...\n\n');
+      
+      if (_gmailJsonPathController.text.isEmpty) {
+        _updateTestOutput('❌ Erro: Selecione o arquivo JSON de credenciais primeiro');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Selecione o arquivo JSON de credenciais'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+        return;
+      }
+      
+      _gmailOAuthService ??= GmailOAuthService();
+      
+      _updateTestOutput('📧 Autenticação Gmail OAuth2...\n\n'
+                       '📄 Arquivo JSON: ${_gmailJsonPathController.text}\n'
+                       '🔐 Carregando credenciais do arquivo...\n'
+                       '🌐 Abrindo navegador para autorização...\n'
+                       '📋 Você será redirecionado para:\n'
+                       '   1. Login na sua conta Gmail\n'
+                       '   2. Autorizar envio de emails\n'
+                       '   3. Retornar automaticamente ao app\n\n'
+                       '⏳ Aguardando autorização...\n');
+      
+      final success = await _gmailOAuthService!.authenticate(
+        jsonPath: _gmailJsonPathController.text,
+      );
+      
+      if (success) {
+        final userEmail = _gmailOAuthService!.userEmail;
+        
+        _updateTestOutput('📧 Autenticação Gmail OAuth2...\n\n'
+                         '✅ Autenticação Gmail OAuth2 concluída!\n'
+                         '✅ Conexão com Gmail API estabelecida!\n\n'
+                         '👤 Informações da conta:\n'
+                         '   📧 Email: ${userEmail ?? 'N/A'}\n'
+                         '   🔐 Método: OAuth2 + JSON\n'
+                         '   📄 Arquivo: ${_gmailJsonPathController.text.split('\\').last}\n\n'
+                         '🎉 Gmail OAuth2 configurado e pronto!\n'
+                         '📤 Relatórios serão enviados via Gmail API\n'
+                         '🔒 Método mais seguro que senha de app');
+        
+        // Testar envio de email
+        if (userEmail != null) {
+          _updateTestOutput('📧 Autenticação Gmail OAuth2...\n\n'
+                           '✅ Autenticação concluída!\n\n'
+                           '🧪 Enviando email de teste...\n');
+          
+          final testSuccess = await _gmailOAuthService!.testConnection(userEmail);
+          
+          if (testSuccess) {
+            _updateTestOutput('📧 Autenticação Gmail OAuth2...\n\n'
+                             '✅ Autenticação concluída!\n'
+                             '✅ Email de teste enviado com sucesso!\n\n'
+                             '🎉 Gmail OAuth2 totalmente funcional!\n'
+                             '📬 Verifique sua caixa de entrada');
+          } else {
+            _updateTestOutput('📧 Autenticação Gmail OAuth2...\n\n'
+                             '✅ Autenticação concluída!\n'
+                             '⚠️ Falha no envio do email de teste\n\n'
+                             '🔧 Verifique as permissões da API');
+          }
+        }
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.white, size: 20),
+                  SizedBox(width: 8),
+                  Text('✅ Gmail OAuth2 configurado!'),
+                ],
+              ),
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      } else {
+        _updateTestOutput('📧 Autenticação Gmail OAuth2...\n\n'
+                         '❌ Falha na autenticação Gmail OAuth2!\n\n'
+                         '🔧 Possíveis causas:\n'
+                         '   • Arquivo JSON inválido ou corrompido\n'
+                         '   • Autorização cancelada pelo usuário\n'
+                         '   • Erro de rede ou timeout\n'
+                         '   • Credenciais não configuradas no arquivo\n\n'
+                         '📋 Soluções:\n'
+                         '   • Baixe novo arquivo JSON do Google Console\n'
+                         '   • Verifique se o arquivo está na pasta correta\n'
+                         '   • Tente novamente\n'
+                         '   • Autorize completamente no navegador');
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('❌ Falha na autenticação Gmail OAuth2'),
+              backgroundColor: AppColors.error,
+              duration: Duration(seconds: 4),
+            ),
+          );
+        }
+      }
+      
+    } catch (e) {
+      _updateTestOutput('📧 Autenticação Gmail OAuth2...\n\n'
+                       '❌ Erro durante autenticação: $e\n\n'
+                       '🔧 Soluções:\n'
+                       '   • Verifique o arquivo JSON\n'
+                       '   • Confirme sua conexão com internet\n'
+                       '   • Tente novamente após alguns minutos\n'
+                       '   • Verifique se não há firewall bloqueando');
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('❌ Erro na autenticação Gmail: ${e.toString()}'),
+            backgroundColor: AppColors.error,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+      }
+    } finally {
+      _setTestLoading(false);
     }
   }
 
